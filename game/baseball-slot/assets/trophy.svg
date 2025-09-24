@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 160" role="img" aria-label="Trophy">
+  <path d="M30 28h80v24c0 24-18 44-40 44S30 76 30 52V28z" fill="#f4c542" stroke="#d19b1f" stroke-width="6"/>
+  <path d="M18 32h24c0 18-6 36-18 44-8-8-10-26-6-44z" fill="#f4c542" stroke="#d19b1f" stroke-width="6"/>
+  <path d="M122 32h-24c0 18 6 36 18 44 8-8 10-26 6-44z" fill="#f4c542" stroke="#d19b1f" stroke-width="6"/>
+  <rect x="54" y="96" width="32" height="18" rx="4" fill="#d19b1f"/>
+  <rect x="40" y="114" width="60" height="22" rx="6" fill="#b07a1b" stroke="#8b5a13" stroke-width="6"/>
+</svg>
