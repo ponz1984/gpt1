@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Baseball Slot Demo</title>
+    <meta http-equiv="refresh" content="0; url=./game/baseball-slot/" />
+    <link rel="canonical" href="./game/baseball-slot/" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+        background: #0e1f33;
+        color: #f7f9fc;
+        text-align: center;
+        padding: 2rem;
+      }
+      main {
+        max-width: 36rem;
+        display: grid;
+        gap: 1.25rem;
+      }
+      a {
+        color: #f4c542;
+        font-weight: 600;
+      }
+    </style>
+    <script>
+      window.addEventListener("DOMContentLoaded", () => {
+        const target = "./game/baseball-slot/";
+        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          window.location.replace(target);
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Baseball Slot Demo</h1>
+      <p>
+        GitHub Pages にホストされた場合は数秒後に
+        <a href="./game/baseball-slot/">ベースボールスロットゲーム</a> に自動的に移動します。
+      </p>
+      <p>
+        すぐに移動しない場合は上記のリンクをクリックしてください。
+      </p>
+    </main>
+  </body>
+</html>
