@@ -25,6 +25,11 @@
         color: #f4c542;
         font-weight: 600;
       }
+      .links {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+      }
     </style>
   </head>
   <body>
@@ -33,11 +38,21 @@
       <p>
         GitHub Pages などで公開する場合は、下記リンクから
         <a href="./game/baseball-slot/">ベースボールスロットゲーム</a>
-        へアクセスしてください。
+        にアクセスしてください。
       </p>
+      <div class="links">
+        <a href="./game/baseball-slot/">▶ ゲームを開く（/game/baseball-slot/）</a>
+      </div>
       <p>
-        サイトのトップページとして情報を掲載したい場合は、このファイルを自由に編集できます。
+        このページはサイトのトップ（ランディング）としてお好きに編集できます。
+        自動リダイレクトは行いません。
       </p>
+      <!--
+        ※将来、自動で /game/baseball-slot/ へ遷移したい場合は、以下いずれかを <head> に追加してください（現在は未使用）。
+        <meta http-equiv="refresh" content="0; url=./game/baseball-slot/" />
+        <script>location.replace('./game/baseball-slot/');</script>
+      -->
     </main>
   </body>
 </html>
+
