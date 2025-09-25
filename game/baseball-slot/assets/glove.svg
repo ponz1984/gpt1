@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" role="img" aria-label="Baseball Glove">
+  <path d="M30 40c-4 32 0 64 32 80s66-12 66-44c0-28-16-46-38-54-12-4-26-6-40 0-8 4-20 10-20 18z" fill="#c68642" stroke="#8b5a2b" stroke-width="6"/>
+  <path d="M40 50c10-12 52-20 68 18" fill="none" stroke="#8b5a2b" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="70" cy="74" r="12" fill="#f8f8f8" stroke="#dcdcdc" stroke-width="4"/>
+</svg>
