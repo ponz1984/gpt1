@@ -4,8 +4,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Baseball Slot Demo</title>
-    <meta http-equiv="refresh" content="0; url=./game/baseball-slot/" />
-    <link rel="canonical" href="./game/baseball-slot/" />
     <style>
       body {
         margin: 0;
@@ -27,26 +25,34 @@
         color: #f4c542;
         font-weight: 600;
       }
+      .links {
+        display: grid;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+      }
     </style>
-    <script>
-      window.addEventListener("DOMContentLoaded", () => {
-        const target = "./game/baseball-slot/";
-        if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          window.location.replace(target);
-        }
-      });
-    </script>
   </head>
   <body>
     <main>
       <h1>Baseball Slot Demo</h1>
       <p>
-        GitHub Pages にホストされた場合は数秒後に
-        <a href="./game/baseball-slot/">ベースボールスロットゲーム</a> に自動的に移動します。
+        GitHub Pages などで公開する場合は、下記リンクから
+        <a href="./game/baseball-slot/">ベースボールスロットゲーム</a>
+        にアクセスしてください。
       </p>
+      <div class="links">
+        <a href="./game/baseball-slot/">▶ ゲームを開く（/game/baseball-slot/）</a>
+      </div>
       <p>
-        すぐに移動しない場合は上記のリンクをクリックしてください。
+        このページはサイトのトップ（ランディング）としてお好きに編集できます。
+        自動リダイレクトは行いません。
       </p>
+      <!--
+        ※将来、自動で /game/baseball-slot/ へ遷移したい場合は、以下いずれかを <head> に追加してください（現在は未使用）。
+        <meta http-equiv="refresh" content="0; url=./game/baseball-slot/" />
+        <script>location.replace('./game/baseball-slot/');</script>
+      -->
     </main>
   </body>
 </html>
+
