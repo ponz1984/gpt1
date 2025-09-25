@@ -1,0 +1,60 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section > button,
+.group button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  font-weight: 600;
+}
+
+.section > button:disabled,
+.group button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.section > button:hover:not(:disabled),
+.group button:hover:not(:disabled) {
+  background: rgba(0, 180, 216, 0.4);
+}
+
+.primary {
+  background: linear-gradient(135deg, #ff4d6d, #ff758f);
+}
+
+.label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toggle {
+  min-width: 72px;
+}
+
+.active {
+  background: rgba(255, 209, 102, 0.6) !important;
+  color: #1b263b;
+}
