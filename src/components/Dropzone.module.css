@@ -1,0 +1,22 @@
+.dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.dropzone:hover,
+.dragging {
+  border-color: #00b4d8;
+  color: #00b4d8;
+  background: rgba(0, 180, 216, 0.1);
+}
+
+.input {
+  display: none;
+}
