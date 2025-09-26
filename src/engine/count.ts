@@ -122,7 +122,7 @@ const SINGLE_OUT_RESULTS = [
   'sacrifice_fly',
   'sac_bunt',
   'sacrifice_bunt',
-  // ランナーアウト（打者アウトに直結しないこともあるが保守的に+1扱いは避ける）
+  // （ランナーアウト等はスコアリングの複雑性からここでは除外）
 ];
 
 function clampOuts(value: number): number {
@@ -190,4 +190,3 @@ export function deriveOutsAfter(
 }
 
 export { clampOuts };
-

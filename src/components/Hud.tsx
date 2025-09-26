@@ -4,7 +4,9 @@ import { formatCount, formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
 function CountDisplay() {
-  const pitch = useStore((state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]);
+  const pitch = useStore(
+    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
+  );
   if (!pitch) return null;
   return (
     <div className="count-card">
@@ -36,7 +38,9 @@ function PitchInfo() {
 
 function ScoreBoard() {
   const meta = useStore((state) => state.meta);
-  const pitch = useStore((state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]);
+  const pitch = useStore(
+    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
+  );
   const inning = useStore((state) => state.atBats[state.currentAtBatIndex]?.inning);
   const half = useStore((state) => state.atBats[state.currentAtBatIndex]?.half);
 
@@ -50,11 +54,7 @@ function ScoreBoard() {
 
   if (!meta || !pitch || !teams || inning === undefined || !half) return null;
 
-  // 投手名の解決優先順:
-  // 1) pitch.pitcherLabel（各投球で直接持っている表示名）
-  // 2) meta.pitcherNames[<id>]（CSVから構築したID→名前マップ）
-  // 3) meta.pitcherName（従来のフィールド）
-  // 4) フォールバック: "投手 <id>"
+  // 投手名の解決優先順
   const pitcherName =
     pitch.pitcherLabel ||
     (meta.pitcherNames ? meta.pitcherNames[pitch.pitcher] : undefined) ||
@@ -86,13 +86,17 @@ function ScoreBoard() {
 }
 
 function ResultBanner() {
-  const pitch = useStore((state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]);
+  const pitch = useStore(
+    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
+  );
   if (!pitch) return null;
   const resultText = pitch.displayResult;
   return (
     <div className={`result-banner${pitch.highlightResult ? ' highlight' : ''}`}>
       <span>結果: {resultText}</span>
-      {pitch.highlightResult && pitch.events && <span className="result-detail">（打席結果）</span>}
+      {pitch.highlightResult && pitch.events && (
+        <span className="result-detail">（打席結果）</span>
+      )}
     </div>
   );
 }
@@ -109,3 +113,4 @@ export default function Hud() {
     </div>
   );
 }
+

@@ -167,9 +167,7 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
   rows.forEach((row) => {
     const key = `${row.game_pk}-${row.at_bat_number}`;
     if (key !== currentKey) {
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup);
-      }
+      if (currentGroup.length > 0) groups.push(currentGroup);
       currentGroup = [];
       currentKey = key;
     }

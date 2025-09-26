@@ -3,7 +3,7 @@ import { Line, PerspectiveCamera } from '@react-three/drei';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { getPositionAtTime } from '../engine/physics';
-import type { Pitch } from '../engine/statcast.types';
+import type { AtBat, Pitch } from '../engine/statcast.types';
 import { useStore } from '../state/useStore';
 import { getPitchColor } from '../utils/colors';
 
@@ -87,20 +87,22 @@ function FieldElements() {
 }
 
 /**
- * StrikeZone
+ * StrikeZone（固定オーバーレイ）
  * - 横幅は常に 17 inch = 17/12 ft。半幅は 17/24 ft。
- * - 縦は sz_top - sz_bot（ft）をそのまま使用。
- * - 中心Xは plate_x、中心Yは (sz_top+sz_bot)/2。
+ * - 縦は当該 AtBat の「先頭ピッチ」の sz_top / sz_bot を採用し、打席中は不変。
+ * - 横中心はホームプレート中心 x=0 に固定（投球ごとに動かない）。
  * - Plate通過面（y=0）に相当する world z=0 付近に配置。
  */
-function StrikeZone({ pitch }: { pitch?: Pitch }) {
+function StrikeZone({ atBat }: { atBat?: AtBat }) {
   const points = useMemo(() => {
-    if (!pitch) return [];
-    const halfWidth = 17 / 24; // 17inch -> ft の半幅（= 1.4167 / 2）
-    const centerX = pitch.plate_x ?? 0;
-    const top = pitch.sz_top ?? 3.5;
-    const bottom = pitch.sz_bot ?? 1.5;
-    const z = 0; // plate通過面
+    if (!atBat || atBat.pitches.length === 0) return [];
+    const first = atBat.pitches[0];
+    const halfWidth = 17 / 24; // (17 inches / 12) / 2 = 0.7083ft
+    const centerX = 0; // plate center に固定
+    const top = first.sz_top ?? 3.5;
+    const bottom = first.sz_bot ?? 1.5;
+    const z = 0;
+
     const corners = [
       [centerX - halfWidth, bottom, z],
       [centerX + halfWidth, bottom, z],
@@ -108,10 +110,11 @@ function StrikeZone({ pitch }: { pitch?: Pitch }) {
       [centerX - halfWidth, top, z],
       [centerX - halfWidth, bottom, z],
     ] as const;
-    return corners.map(([x, y, zPos]) => new THREE.Vector3(x, y, zPos));
-  }, [pitch]);
 
-  if (!pitch) return null;
+    return corners.map(([x, y, zPos]) => new THREE.Vector3(x, y, zPos));
+  }, [atBat]);
+
+  if (!atBat) return null;
   return (
     <Line
       points={points}
@@ -230,9 +233,10 @@ function CameraRig() {
 }
 
 function SceneContents() {
-  const { pitch, showTrajectory, showReleasePoint, showStrikeZone } = useStore((state) => {
+  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone } = useStore((state) => {
     const atBat = state.atBats[state.currentAtBatIndex];
     return {
+      atBat,
       pitch: atBat?.pitches[state.currentPitchIndex],
       showTrajectory: state.showTrajectory,
       showReleasePoint: state.showReleasePoint,
@@ -246,7 +250,7 @@ function SceneContents() {
       <directionalLight position={[20, 30, 20]} intensity={0.7} />
       <directionalLight position={[-20, 30, -20]} intensity={0.45} />
       <FieldElements />
-      {showStrikeZone && <StrikeZone pitch={pitch} />}
+      {showStrikeZone && <StrikeZone atBat={atBat} />}
       {showTrajectory && <Trajectory pitch={pitch} />}
       {showReleasePoint && <ReleaseMarker pitch={pitch} />}
       <Ball pitch={pitch} />
@@ -267,4 +271,3 @@ export default function Canvas3D() {
     </div>
   );
 }
-
