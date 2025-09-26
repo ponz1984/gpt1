@@ -7,12 +7,12 @@ import type { AtBat, Pitch } from '../engine/statcast.types';
 import { useStore } from '../state/useStore';
 import { getPitchColor } from '../utils/colors';
 
-const PASTEL = {
-  sky: '#EEF2FF',
-  grass: '#C8EAD6',
-  dirt: '#F2DECF',
-  plate: '#FFFFFF',
-  line: '#E5E7EB',
+const PARK = {
+  dirt: '#D9C3A7',
+  grass: '#A9D7B0',
+  deep: '#5CA08B',
+  line: '#FFFFFF',
+  box: '#FFFFFF',
 } as const;
 
 const CAMERA_PRESETS = {
@@ -41,6 +41,29 @@ function resolvePitchColor(pitch: Pitch | undefined): string {
   return getPitchColor(pitch.pitch_type);
 }
 
+function BatterBox({ x }: { x: number }) {
+  const edges = useMemo(() => {
+    const width = 4;
+    const depth = 6;
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, -depth / 2);
+    shape.lineTo(width / 2, -depth / 2);
+    shape.lineTo(width / 2, depth / 2);
+    shape.lineTo(-width / 2, depth / 2);
+    shape.lineTo(-width / 2, -depth / 2);
+    const geometry2d = new THREE.ShapeGeometry(shape);
+    const edgesGeometry = new THREE.EdgesGeometry(geometry2d);
+    geometry2d.dispose();
+    return edgesGeometry;
+  }, []);
+
+  return (
+    <lineSegments position={[x, 0.02, 3]} rotation={[-Math.PI / 2, 0, 0]} geometry={edges}>
+      <lineBasicMaterial color={PARK.box} transparent opacity={0.9} />
+    </lineSegments>
+  );
+}
+
 function FieldElements() {
   const plateShape = useMemo(() => {
     const shape = new THREE.Shape();
@@ -58,40 +81,42 @@ function FieldElements() {
 
   return (
     <group>
-      {/* フィールド（パステル） */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[120, 140]} />
-        <meshStandardMaterial color={PASTEL.grass} roughness={1} />
+      {/* 手前: 土 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 22]}>
+        <planeGeometry args={[120, 44]} />
+        <meshStandardMaterial color={PARK.dirt} roughness={1} />
+      </mesh>
+
+      {/* 中央: 芝 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -8]}>
+        <planeGeometry args={[120, 110]} />
+        <meshStandardMaterial color={PARK.grass} roughness={1} />
+      </mesh>
+
+      {/* 奥: フェンス/空 */}
+      <mesh position={[0, 12, -80]}>
+        <planeGeometry args={[120, 36]} />
+        <meshStandardMaterial color={PARK.deep} roughness={1} />
       </mesh>
 
       {/* ホームベース */}
       <mesh rotation={[0, 0, 0]} position={[0, 0.01, 0]} geometry={homePlate}>
-        <meshStandardMaterial color={PASTEL.plate} />
+        <meshStandardMaterial color={PARK.line} />
       </mesh>
 
-      {/* マウンド（残す） */}
-      <mesh position={[0, 0.25, -60]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[3, 5, 1.5, 32]} />
-        <meshStandardMaterial color={PASTEL.dirt} roughness={0.9} />
-      </mesh>
-
-      {/* ファウルライン等（パステル） */}
-      <mesh position={[-3, 0.02, 3]}>
-        <boxGeometry args={[4, 0.05, 6]} />
-        <meshStandardMaterial color={PASTEL.line} opacity={0.35} transparent />
-      </mesh>
-      <mesh position={[3, 0.02, 3]}>
-        <boxGeometry args={[4, 0.05, 6]} />
-        <meshStandardMaterial color={PASTEL.line} opacity={0.35} transparent />
-      </mesh>
+      {/* 既存ライン */}
       <mesh position={[0, 0.02, -1]}>
         <boxGeometry args={[1.5, 0.05, 1.5]} />
-        <meshStandardMaterial color={PASTEL.plate} opacity={0.65} transparent />
+        <meshStandardMaterial color={PARK.line} opacity={0.65} transparent />
       </mesh>
       <mesh position={[0, 0.02, 0]}>
         <boxGeometry args={[0.1, 0.05, 8]} />
-        <meshStandardMaterial color={PASTEL.line} opacity={0.4} transparent />
+        <meshStandardMaterial color={PARK.line} opacity={0.4} transparent />
       </mesh>
+
+      {/* バッターボックス */}
+      <BatterBox x={-3} />
+      <BatterBox x={3} />
     </group>
   );
 }

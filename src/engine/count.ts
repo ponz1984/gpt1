@@ -165,7 +165,7 @@ export type OutsOptions = {
 /**
  * ピッチ後のアウト数を算出
  * - 基本は outsBefore + イベント増分（打席終了時のみ加算）
- * - 次打席が存在し、その outs_when_up が取得できる場合は「次打席の値を優先」（整合補正）
+ * - 次打席が存在し、その outs_when_up が取得できる場合は「次打席の値を優先」（公式スコアに合わせる）
  */
 export function deriveOutsAfter(
   row: PitchRow,
