@@ -271,3 +271,4 @@ export default function Canvas3D() {
     </div>
   );
 }
+

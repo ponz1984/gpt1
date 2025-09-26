@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useStore } from '../state/useStore';
-import { formatCount, formatInning } from '../utils/formatters';
+import CountDots from './CountDots';
+import { formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
 function CountDisplay() {
@@ -11,8 +12,11 @@ function CountDisplay() {
   return (
     <div className="count-card">
       <div className="count-title">カウント</div>
-      <div className="count-value">{formatCount(pitch.postCount)}</div>
-      <div className="count-outs">アウト {pitch.outsAfter}</div>
+      <CountDots
+        balls={pitch.postCount.balls}
+        strikes={pitch.postCount.strikes}
+        outs={pitch.outsAfter}
+      />
     </div>
   );
 }
@@ -54,7 +58,11 @@ function ScoreBoard() {
 
   if (!meta || !pitch || !teams || inning === undefined || !half) return null;
 
-  // 投手名の解決優先順
+  // 投手名の解決優先順:
+  // 1) pitch.pitcherLabel（各投球で直接持っている表示名）
+  // 2) meta.pitcherNames[<id>]（CSVから構築したID→名前マップ）
+  // 3) meta.pitcherName（互換用フィールド）
+  // 4) フォールバック: "投手 <id>"
   const pitcherName =
     pitch.pitcherLabel ||
     (meta.pitcherNames ? meta.pitcherNames[pitch.pitcher] : undefined) ||

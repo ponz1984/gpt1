@@ -105,3 +105,4 @@ export type ParsedGame = {
   pitches: Pitch[];
   meta: GameMeta;
 };
+
