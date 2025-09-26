@@ -74,6 +74,7 @@ export type PitchDerived = {
   highlightResult: boolean;
   speedLabel: string;
   pitchLabel: string;
+  /** 各投球時点の投手表示名（優先: row.player_name → meta.pitcherNames[id] → フォールバック） */
   pitcherLabel: string;
 };
 
@@ -93,7 +94,9 @@ export type GameMeta = {
   gamePk: number;
   homeTeam: string;
   awayTeam: string;
+  /** 初期投手名（互換保持） */
   pitcherName: string;
+  /** 投手ID→名前の辞書（HUD更新に利用） */
   pitcherNames: Record<number, string>;
 };
 
@@ -102,3 +105,4 @@ export type ParsedGame = {
   pitches: Pitch[];
   meta: GameMeta;
 };
+

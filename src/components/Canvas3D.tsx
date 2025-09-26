@@ -31,6 +31,8 @@ const CAMERA_PRESETS = {
 } satisfies Record<string, { position: THREE.Vector3; target: THREE.Vector3 }>;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
+  // Statcast: x(左右), y(捕手方向への距離), z(高さ)
+  // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
   return new THREE.Vector3(sample.x, sample.z, -sample.y);
 }
 
@@ -65,6 +67,7 @@ function BatterBox({ x }: { x: number }) {
 function FieldElements() {
   const plateShape = useMemo(() => {
     const shape = new THREE.Shape();
+    // ホームベース（幅=17in=1.4167ftに合わせたおおよそ）
     shape.moveTo(-0.708, 0);
     shape.lineTo(0.708, 0);
     shape.lineTo(0.708, -0.708);
@@ -78,21 +81,30 @@ function FieldElements() {
 
   return (
     <group>
+      {/* 手前: 土 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 22]}>
         <planeGeometry args={[120, 44]} />
         <meshStandardMaterial color={PARK.dirt} roughness={1} />
       </mesh>
+
+      {/* 中央: 芝 */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -8]}>
         <planeGeometry args={[120, 110]} />
         <meshStandardMaterial color={PARK.grass} roughness={1} />
       </mesh>
+
+      {/* 奥: フェンス/空 */}
       <mesh position={[0, 12, -80]}>
         <planeGeometry args={[120, 36]} />
         <meshStandardMaterial color={PARK.deep} roughness={1} />
       </mesh>
+
+      {/* ホームベース */}
       <mesh rotation={[0, 0, 0]} position={[0, 0.01, 0]} geometry={homePlate}>
         <meshStandardMaterial color={PARK.line} />
       </mesh>
+
+      {/* 既存ライン */}
       <mesh position={[0, 0.02, -1]}>
         <boxGeometry args={[1.5, 0.05, 1.5]} />
         <meshStandardMaterial color={PARK.line} opacity={0.65} transparent />
@@ -101,21 +113,31 @@ function FieldElements() {
         <boxGeometry args={[0.1, 0.05, 8]} />
         <meshStandardMaterial color={PARK.line} opacity={0.4} transparent />
       </mesh>
+
+      {/* バッターボックス */}
       <BatterBox x={-3} />
       <BatterBox x={3} />
     </group>
   );
 }
 
+/**
+ * StrikeZone（固定オーバーレイ）
+ * - 横幅は常に 17 inch = 17/12 ft。半幅は 17/24 ft。
+ * - 縦は当該 AtBat の「先頭ピッチ」の sz_top / sz_bot を採用し、打席中は不変。
+ * - 横中心はホームプレート中心 x=0 に固定（投球ごとに動かない）。
+ * - Plate通過面（y=0）に相当する world z=0 付近に配置。
+ */
 function StrikeZone({ atBat }: { atBat?: AtBat }) {
   const points = useMemo(() => {
     if (!atBat || atBat.pitches.length === 0) return [];
     const first = atBat.pitches[0];
-    const halfWidth = 17 / 24; // (17 inches / 12) / 2
-    const centerX = 0;
+    const halfWidth = 17 / 24; // (17 inches / 12) / 2 = 0.7083ft
+    const centerX = 0; // plate center に固定
     const top = first.sz_top ?? 3.5;
     const bottom = first.sz_bot ?? 1.5;
     const z = 0;
+
     const corners = [
       [centerX - halfWidth, bottom, z],
       [centerX + halfWidth, bottom, z],
@@ -123,6 +145,7 @@ function StrikeZone({ atBat }: { atBat?: AtBat }) {
       [centerX - halfWidth, top, z],
       [centerX - halfWidth, bottom, z],
     ] as const;
+
     return corners.map(([x, y, zPos]) => new THREE.Vector3(x, y, zPos));
   }, [atBat]);
 
@@ -174,6 +197,8 @@ function Ball({ pitch }: { pitch?: Pitch }) {
   const timeRef = useRef(0);
   const waitRef = useRef(0);
   const waitingRef = useRef(false);
+
+  // 効果音
   const ballSfxRef = useRef<HTMLAudioElement | null>(null);
   const batSfxRef = useRef<HTMLAudioElement | null>(null);
   const sfxArmedRef = useRef(false);
@@ -248,6 +273,7 @@ function Ball({ pitch }: { pitch?: Pitch }) {
     const position = worldFromSample(sample);
     meshRef.current.position.copy(position);
 
+    // 捕手到達直前で SFX（1回だけ）
     const soundLead = 0.03;
     const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
     if (sfxArmedRef.current && timeRef.current >= triggerTime) {
@@ -258,7 +284,7 @@ function Ball({ pitch }: { pitch?: Pitch }) {
           target.currentTime = 0;
           void target.play();
         } catch {
-          // ignore autoplay or loading restrictions
+          // ブラウザの自動再生制限などは握りつぶす
         }
       }
     }
@@ -329,3 +355,4 @@ export default function Canvas3D() {
     </div>
   );
 }
+
