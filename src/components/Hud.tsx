@@ -50,9 +50,14 @@ function ScoreBoard() {
 
   if (!meta || !pitch || !teams || inning === undefined || !half) return null;
 
+  // 投手名の解決優先順:
+  // 1) pitch.pitcherLabel（各投球で直接持っている表示名）
+  // 2) meta.pitcherNames[<id>]（CSVから構築したID→名前マップ）
+  // 3) meta.pitcherName（従来のフィールド）
+  // 4) フォールバック: "投手 <id>"
   const pitcherName =
     pitch.pitcherLabel ||
-    meta.pitcherNames?.[pitch.pitcher] ||
+    (meta.pitcherNames ? meta.pitcherNames[pitch.pitcher] : undefined) ||
     meta.pitcherName ||
     `投手 ${pitch.pitcher}`;
 
