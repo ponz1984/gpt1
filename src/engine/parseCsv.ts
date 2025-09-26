@@ -112,13 +112,9 @@ function buildMeta(rows: PitchRow[], pitcherNames: Map<number, string>): GameMet
 }
 
 function resolvePitcherLabel(row: PitchRow, pitcherNames: Map<number, string>): string {
-  if (row.player_name) {
-    return row.player_name;
-  }
+  if (row.player_name) return row.player_name;
   const mapped = pitcherNames.get(row.pitcher);
-  if (mapped) {
-    return mapped;
-  }
+  if (mapped) return mapped;
   return `投手 ${row.pitcher}`;
 }
 
@@ -171,18 +167,13 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
   rows.forEach((row) => {
     const key = `${row.game_pk}-${row.at_bat_number}`;
     if (key !== currentKey) {
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup);
-      }
+      if (currentGroup.length > 0) groups.push(currentGroup);
       currentGroup = [];
       currentKey = key;
     }
     currentGroup.push(row);
   });
-
-  if (currentGroup.length > 0) {
-    groups.push(currentGroup);
-  }
+  if (currentGroup.length > 0) groups.push(currentGroup);
 
   const atBats: AtBat[] = [];
   let order = 0;
@@ -199,16 +190,19 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
       pitches: [],
     };
 
+    // アウト推移トラッカー：打席開始時の outs_when_up からスタート
     let outsTracker = first.outs_when_up;
 
     group.forEach((row, indexInAtBat) => {
       const nextInAtBat = group[indexInAtBat + 1];
       const nextAtBatFirst = nextGroup ? nextGroup[0] : undefined;
       const isLastPitch = !nextInAtBat;
+
       const outsAfter = deriveOutsAfter(row, outsTracker, {
         isLastPitchOfAtBat: isLastPitch,
         nextAtBatFirst,
       });
+
       const pitch = createPitch(
         row,
         order,
@@ -222,6 +216,7 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
       atBat.pitches.push(pitch);
       order += 1;
 
+      // 打席が終わったらトラッカーを更新（3アウト到達なら 0 にリセットして次回へ）
       if (isLastPitch) {
         outsTracker = outsAfter >= 3 ? 0 : outsAfter;
       }
@@ -257,16 +252,17 @@ export function parseCsv(text: string): ParsedGame {
   }
 
   const sortedRows = sortRows(rows);
+
+  // 投手ID→名前の辞書を構築（HUD更新に利用）
   const pitcherNames = new Map<number, string>();
   sortedRows.forEach((row) => {
-    if (row.player_name) {
-      pitcherNames.set(row.pitcher, row.player_name);
-    }
+    if (row.player_name) pitcherNames.set(row.pitcher, row.player_name);
   });
-  const atBats = groupAtBats(sortedRows, pitcherNames);
-  const pitches = atBats.flatMap((atBat) => atBat.pitches);
 
+  const atBats = groupAtBats(sortedRows, pitcherNames);
+  const pitches = atBats.flatMap((ab) => ab.pitches);
   const meta = buildMeta(sortedRows, pitcherNames);
 
   return { atBats, pitches, meta };
 }
+

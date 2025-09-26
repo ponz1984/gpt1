@@ -23,6 +23,8 @@ const CAMERA_PRESETS = {
 } satisfies Record<string, { position: THREE.Vector3; target: THREE.Vector3 }>;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
+  // Statcast: x(左右), y(捕手方向への距離), z(高さ)
+  // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
   return new THREE.Vector3(sample.x, sample.z, -sample.y);
 }
 
@@ -34,6 +36,7 @@ function resolvePitchColor(pitch: Pitch | undefined): string {
 function FieldElements() {
   const plateShape = useMemo(() => {
     const shape = new THREE.Shape();
+    // ホームベース（幅=17in=1.4167ftに合わせたおおよそ）
     shape.moveTo(-0.708, 0);
     shape.lineTo(0.708, 0);
     shape.lineTo(0.708, -0.708);
@@ -47,6 +50,7 @@ function FieldElements() {
 
   return (
     <group>
+      {/* マウンド・外野・ホーム等の簡易モデル */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -90]}>
         <cylinderGeometry args={[9, 15, 0.5, 24]} />
         <meshStandardMaterial color="#b45309" roughness={0.8} />
@@ -82,15 +86,23 @@ function FieldElements() {
   );
 }
 
+/**
+ * StrikeZone（固定オーバーレイ）
+ * - 横幅は常に 17 inch = 17/12 ft。半幅は 17/24 ft。
+ * - 縦は当該 AtBat の「先頭ピッチ」の sz_top / sz_bot を採用し、打席中は不変。
+ * - 横中心はホームプレート中心 x=0 に固定（投球ごとに動かない）。
+ * - Plate通過面（y=0）に相当する world z=0 付近に配置。
+ */
 function StrikeZone({ atBat }: { atBat?: AtBat }) {
   const points = useMemo(() => {
     if (!atBat || atBat.pitches.length === 0) return [];
     const first = atBat.pitches[0];
-    const halfWidth = 17 / 24; // (17 inches / 12) / 2
-    const centerX = 0;
+    const halfWidth = 17 / 24; // (17 inches / 12) / 2 = 0.7083ft
+    const centerX = 0; // plate center に固定
     const top = first.sz_top ?? 3.5;
     const bottom = first.sz_bot ?? 1.5;
     const z = 0;
+
     const corners = [
       [centerX - halfWidth, bottom, z],
       [centerX + halfWidth, bottom, z],
@@ -98,6 +110,7 @@ function StrikeZone({ atBat }: { atBat?: AtBat }) {
       [centerX - halfWidth, top, z],
       [centerX - halfWidth, bottom, z],
     ] as const;
+
     return corners.map(([x, y, zPos]) => new THREE.Vector3(x, y, zPos));
   }, [atBat]);
 
