@@ -23,6 +23,8 @@ const CAMERA_PRESETS = {
 } satisfies Record<string, { position: THREE.Vector3; target: THREE.Vector3 }>;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
+  // Statcast: x(左右), y(捕手方向への距離), z(高さ)
+  // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
   return new THREE.Vector3(sample.x, sample.z, -sample.y);
 }
 
@@ -34,6 +36,7 @@ function resolvePitchColor(pitch: Pitch | undefined): string {
 function FieldElements() {
   const plateShape = useMemo(() => {
     const shape = new THREE.Shape();
+    // ホームベース（幅=17in=1.4167ftに合わせたおおよそ）
     shape.moveTo(-0.708, 0);
     shape.lineTo(0.708, 0);
     shape.lineTo(0.708, -0.708);
@@ -47,6 +50,7 @@ function FieldElements() {
 
   return (
     <group>
+      {/* マウンド・外野・ホーム等の簡易モデル */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -90]}>
         <cylinderGeometry args={[9, 15, 0.5, 24]} />
         <meshStandardMaterial color="#b45309" roughness={0.8} />
@@ -82,25 +86,42 @@ function FieldElements() {
   );
 }
 
+/**
+ * StrikeZone
+ * - 横幅は常に 17 inch = 17/12 ft。半幅は 17/24 ft。
+ * - 縦は sz_top - sz_bot（ft）をそのまま使用。
+ * - 中心Xは plate_x、中心Yは (sz_top+sz_bot)/2。
+ * - Plate通過面（y=0）に相当する world z=0 付近に配置。
+ */
 function StrikeZone({ pitch }: { pitch?: Pitch }) {
   const points = useMemo(() => {
     if (!pitch) return [];
-    const halfWidth = 17 / 24 / 2; // inches to feet conversion (17in / 12 / 2)
-    const top = pitch.sz_top;
-    const bottom = pitch.sz_bot;
-    const z = 0.01;
+    const halfWidth = 17 / 24; // 17inch -> ft の半幅（= 1.4167 / 2）
+    const centerX = pitch.plate_x ?? 0;
+    const top = pitch.sz_top ?? 3.5;
+    const bottom = pitch.sz_bot ?? 1.5;
+    const z = 0; // plate通過面
     const corners = [
-      [-halfWidth, bottom, z],
-      [halfWidth, bottom, z],
-      [halfWidth, top, z],
-      [-halfWidth, top, z],
-      [-halfWidth, bottom, z],
+      [centerX - halfWidth, bottom, z],
+      [centerX + halfWidth, bottom, z],
+      [centerX + halfWidth, top, z],
+      [centerX - halfWidth, top, z],
+      [centerX - halfWidth, bottom, z],
     ] as const;
     return corners.map(([x, y, zPos]) => new THREE.Vector3(x, y, zPos));
   }, [pitch]);
 
   if (!pitch) return null;
-  return <Line points={points} color="#bfdbfe" lineWidth={2} transparent opacity={0.8} />;
+  return (
+    <Line
+      points={points}
+      color="#bfdbfe"
+      lineWidth={2}
+      transparent
+      opacity={0.85}
+      depthTest={false}
+    />
+  );
 }
 
 function Trajectory({ pitch }: { pitch?: Pitch }) {
@@ -246,3 +267,4 @@ export default function Canvas3D() {
     </div>
   );
 }
+
