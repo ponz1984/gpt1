@@ -7,6 +7,14 @@ import type { AtBat, Pitch } from '../engine/statcast.types';
 import { useStore } from '../state/useStore';
 import { getPitchColor } from '../utils/colors';
 
+const PASTEL = {
+  sky: '#EEF2FF',
+  grass: '#C8EAD6',
+  dirt: '#F2DECF',
+  plate: '#FFFFFF',
+  line: '#E5E7EB',
+} as const;
+
 const CAMERA_PRESETS = {
   catcher: {
     position: new THREE.Vector3(0, 6.5, 12),
@@ -50,37 +58,39 @@ function FieldElements() {
 
   return (
     <group>
-      {/* マウンド・外野・ホーム等の簡易モデル */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -90]}>
-        <cylinderGeometry args={[9, 15, 0.5, 24]} />
-        <meshStandardMaterial color="#b45309" roughness={0.8} />
-      </mesh>
+      {/* フィールド（パステル） */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[120, 140]} />
-        <meshStandardMaterial color="#064e3b" roughness={1} />
+        <meshStandardMaterial color={PASTEL.grass} roughness={1} />
       </mesh>
+
+      {/* ホームベース */}
       <mesh rotation={[0, 0, 0]} position={[0, 0.01, 0]} geometry={homePlate}>
-        <meshStandardMaterial color="#e5e7eb" />
+        <meshStandardMaterial color={PASTEL.plate} />
       </mesh>
+
+      {/* マウンド（残す） */}
       <mesh position={[0, 0.25, -60]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[3, 5, 1.5, 32]} />
-        <meshStandardMaterial color="#b45309" roughness={0.9} />
+        <meshStandardMaterial color={PASTEL.dirt} roughness={0.9} />
       </mesh>
+
+      {/* ファウルライン等（パステル） */}
       <mesh position={[-3, 0.02, 3]}>
         <boxGeometry args={[4, 0.05, 6]} />
-        <meshStandardMaterial color="#f3f4f6" opacity={0.35} transparent />
+        <meshStandardMaterial color={PASTEL.line} opacity={0.35} transparent />
       </mesh>
       <mesh position={[3, 0.02, 3]}>
         <boxGeometry args={[4, 0.05, 6]} />
-        <meshStandardMaterial color="#f3f4f6" opacity={0.35} transparent />
+        <meshStandardMaterial color={PASTEL.line} opacity={0.35} transparent />
       </mesh>
       <mesh position={[0, 0.02, -1]}>
         <boxGeometry args={[1.5, 0.05, 1.5]} />
-        <meshStandardMaterial color="#f8fafc" opacity={0.65} transparent />
+        <meshStandardMaterial color={PASTEL.plate} opacity={0.65} transparent />
       </mesh>
       <mesh position={[0, 0.02, 0]}>
         <boxGeometry args={[0.1, 0.05, 8]} />
-        <meshStandardMaterial color="#f9fafb" opacity={0.4} transparent />
+        <meshStandardMaterial color={PASTEL.line} opacity={0.4} transparent />
       </mesh>
     </group>
   );
@@ -163,6 +173,39 @@ function Ball({ pitch }: { pitch?: Pitch }) {
   const waitRef = useRef(0);
   const waitingRef = useRef(false);
 
+  // 効果音
+  const ballSfxRef = useRef<HTMLAudioElement | null>(null);
+  const batSfxRef = useRef<HTMLAudioElement | null>(null);
+  const sfxArmedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof Audio === 'undefined') return;
+    const ballAudio = new Audio('/ball.mp3');
+    const batAudio = new Audio('/bat.mp3');
+    [ballAudio, batAudio].forEach((audio) => {
+      if (!audio) return;
+      audio.preload = 'auto';
+      audio.volume = 0.6;
+    });
+    ballSfxRef.current = ballAudio;
+    batSfxRef.current = batAudio;
+    return () => {
+      ballSfxRef.current = null;
+      batSfxRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    sfxArmedRef.current = Boolean(pitch);
+  }, [pitch]);
+
+  const isContact = useMemo(() => {
+    if (!pitch) return false;
+    const surface = `${pitch.events ?? ''} ${pitch.description ?? ''}`.toLowerCase();
+    if (pitch.type === 'X') return true;
+    return /foul|foul_tip|tip|in_play|single|double|triple|home_run|homer/.test(surface);
+  }, [pitch]);
+
   useEffect(() => {
     timeRef.current = 0;
     waitRef.current = 0;
@@ -204,6 +247,22 @@ function Ball({ pitch }: { pitch?: Pitch }) {
     const sample = getPositionAtTime(pitch.samples, nextTime);
     const position = worldFromSample(sample);
     meshRef.current.position.copy(position);
+
+    // 捕手到達直前で SFX（1回だけ）
+    const soundLead = 0.03;
+    const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
+    if (sfxArmedRef.current && timeRef.current >= triggerTime) {
+      const target = isContact ? batSfxRef.current : ballSfxRef.current;
+      sfxArmedRef.current = false;
+      if (target) {
+        try {
+          target.currentTime = 0;
+          void target.play();
+        } catch {
+          // ブラウザの自動再生制限などは握りつぶす
+        }
+      }
+    }
 
     if (nextTime >= pitch.duration - 1e-3) {
       waitingRef.current = true;
@@ -262,8 +321,8 @@ export default function Canvas3D() {
   return (
     <div className="canvas-wrapper">
       <Canvas shadows camera={{ position: [0, 6, 12], fov: 45 }}>
-        <color attach="background" args={[0.03, 0.05, 0.1]} />
-        <fog attach="fog" args={[0x050816, 40, 260]} />
+        <color attach="background" args={[0.933, 0.949, 1]} />
+        <fog attach="fog" args={[0xeef2ff, 40, 260]} />
         <PerspectiveCamera makeDefault position={[0, 6, 12]} fov={45} />
         <CameraRig />
         <SceneContents />
