@@ -11,17 +11,31 @@ function CountDisplay() {
     lastVisibleCount: state.lastVisibleCount,
   }));
 
-  if (phase === 'preFirst' || phase === 'inningBreak') {
+  if (phase === 'preFirst' || phase === 'arming') {
     return null;
   }
 
-  const countSource = displayPitch
+  if (phase === 'inningBreak') {
+    return (
+      <div className="count-card">
+        <div className="count-title">カウント</div>
+        <div className="count-change">３アウトチェンジ</div>
+      </div>
+    );
+  }
+
+  const countFromPitch = displayPitch
     ? {
         balls: displayPitch.postCount.balls,
         strikes: displayPitch.postCount.strikes,
         outs: displayPitch.outsAfter,
       }
-    : lastVisibleCount;
+    : undefined;
+
+  const countSource =
+    phase === 'pitch' || phase === 'hold'
+      ? countFromPitch ?? lastVisibleCount
+      : lastVisibleCount ?? countFromPitch;
 
   if (!countSource) {
     return null;
@@ -36,11 +50,14 @@ function CountDisplay() {
 }
 
 function PitchInfo() {
-  const { atBat, pitch, meta } = useStore((state) => ({
+  const { atBat, pitch, meta, phase } = useStore((state) => ({
     atBat: selectDisplayAtBat(state),
     pitch: selectDisplayPitch(state),
     meta: state.meta,
+    phase: state.phase,
   }));
+
+  if (phase === 'preFirst' || phase === 'arming') return null;
 
   if (!pitch || !atBat || !meta) return null;
 
@@ -227,4 +244,5 @@ export default function Hud() {
     </div>
   );
 }
+
 
