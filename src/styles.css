@@ -177,6 +177,19 @@ button {
   min-width: 140px;
 }
 
+.count-card {
+  min-height: 110px;
+  justify-content: center;
+}
+
+.count-change {
+  font-size: 0.95rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .bases-card {
   background: rgba(15, 23, 42, 0.55);
   padding: 0.8rem 1rem;
