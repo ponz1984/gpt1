@@ -34,6 +34,10 @@ const CAMERA_PRESETS = {
 const BASE_DISTANCE = 18;
 const BASE_SIZE = 2.6;
 
+const FIRST_PITCH_DELAY_SEC = 2.0;
+const BETWEEN_PITCH_DELAY_SEC = 5.0;
+const INNING_CHANGE_EXTRA_SEC = 2.0;
+
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
   // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
@@ -140,14 +144,22 @@ function ReleaseMarker({ pitch }: { pitch?: Pitch }) {
 
 function Ball({ pitch }: { pitch?: Pitch }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { isPlaying, playbackSpeed, nextPitch } = useStore((state) => ({
-    isPlaying: state.isPlaying,
-    playbackSpeed: state.playbackSpeed,
-    nextPitch: state.nextPitch,
-  }));
+  const { isPlaying, playbackSpeed, nextPitch, atBats, currentAtBatIndex, currentPitchIndex } = useStore(
+    (state) => ({
+      isPlaying: state.isPlaying,
+      playbackSpeed: state.playbackSpeed,
+      nextPitch: state.nextPitch,
+      atBats: state.atBats,
+      currentAtBatIndex: state.currentAtBatIndex,
+      currentPitchIndex: state.currentPitchIndex,
+    })
+  );
   const timeRef = useRef(0);
   const waitRef = useRef(0);
   const waitingRef = useRef(false);
+  const waitDurationRef = useRef(0.9);
+  const waitActionRef = useRef<'first' | 'nextPitch' | null>(null);
+  const firstPitchDelayDoneRef = useRef(false);
 
   // 効果音
   const ballSfxRef = useRef<HTMLAudioElement | null>(null);
@@ -182,25 +194,78 @@ function Ball({ pitch }: { pitch?: Pitch }) {
     return /foul|foul_tip|tip|in_play|single|double|triple|home_run|homer/.test(surface);
   }, [pitch]);
 
+  const isFirstPitch = currentAtBatIndex === 0 && currentPitchIndex === 0;
+
+  const upcomingPitchContext = useMemo(() => {
+    const currentAtBat = atBats[currentAtBatIndex];
+    const currentPitch = currentAtBat?.pitches[currentPitchIndex];
+
+    let nextPitchData: Pitch | undefined;
+    if (currentAtBat) {
+      if (currentPitchIndex + 1 < currentAtBat.pitches.length) {
+        nextPitchData = currentAtBat.pitches[currentPitchIndex + 1];
+      } else {
+        for (let i = currentAtBatIndex + 1; i < atBats.length; i += 1) {
+          const candidate = atBats[i];
+          if (candidate && candidate.pitches.length > 0) {
+            nextPitchData = candidate.pitches[0];
+            break;
+          }
+        }
+      }
+    }
+
+    const changesInning = Boolean(
+      currentPitch &&
+        nextPitchData &&
+        (nextPitchData.inning !== currentPitch.inning ||
+          nextPitchData.inning_topbot !== currentPitch.inning_topbot)
+    );
+
+    return { nextPitchData, changesInning };
+  }, [atBats, currentAtBatIndex, currentPitchIndex, pitch]);
+
   useEffect(() => {
     timeRef.current = 0;
     waitRef.current = 0;
     waitingRef.current = false;
-    if (pitch && meshRef.current) {
-      const first = pitch.samples[0];
-      const pos = worldFromSample(first);
-      meshRef.current.position.copy(pos);
+    waitActionRef.current = null;
+    if (!meshRef.current) return;
+
+    if (!pitch) {
+      meshRef.current.visible = false;
+      return;
     }
-  }, [pitch]);
+
+    const first = pitch.samples[0];
+    const pos = worldFromSample(first);
+    meshRef.current.position.copy(pos);
+    meshRef.current.visible = true;
+
+    if (isFirstPitch && !firstPitchDelayDoneRef.current) {
+      waitingRef.current = true;
+      waitDurationRef.current = FIRST_PITCH_DELAY_SEC;
+      waitActionRef.current = 'first';
+      meshRef.current.visible = false;
+    }
+  }, [pitch, isFirstPitch]);
 
   useFrame((_, delta) => {
     if (!pitch || !meshRef.current) return;
     if (waitingRef.current) {
       waitRef.current += delta;
-      if (waitRef.current >= 0.9 && isPlaying) {
+      if (waitRef.current >= waitDurationRef.current && isPlaying) {
         waitingRef.current = false;
         waitRef.current = 0;
-        nextPitch();
+        const action = waitActionRef.current;
+        waitActionRef.current = null;
+        if (action === 'first') {
+          firstPitchDelayDoneRef.current = true;
+          meshRef.current.visible = true;
+        } else if (action === 'nextPitch') {
+          meshRef.current.visible = true;
+          nextPitch();
+        }
       }
       return;
     }
@@ -243,12 +308,16 @@ function Ball({ pitch }: { pitch?: Pitch }) {
     if (nextTime >= pitch.duration - 1e-3) {
       waitingRef.current = true;
       waitRef.current = 0;
+      waitDurationRef.current =
+        BETWEEN_PITCH_DELAY_SEC + (upcomingPitchContext.changesInning ? INNING_CHANGE_EXTRA_SEC : 0);
+      waitActionRef.current = 'nextPitch';
+      meshRef.current.visible = false;
     }
   });
 
   return (
     <mesh ref={meshRef}>
-      <sphereGeometry args={[0.35, 32, 32]} />
+      <sphereGeometry args={[0.18, 32, 32]} />
       <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.2} />
     </mesh>
   );
@@ -317,5 +386,4 @@ export default function Canvas3D() {
     </div>
   );
 }
-
 
