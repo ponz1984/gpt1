@@ -293,8 +293,7 @@ function Ball({
       phaseDurationRef.current = TRAJECTORY_LEAD_SEC;
       phaseTimerRef.current = 0;
       setUiIdle(false);
-      onTrajectoryPhaseChange(true);
-      ensurePhase('pitch');
+      onTrajectoryPhaseChange(false);
     }
   }, [pitch, isFirstPitch, onTrajectoryPhaseChange, setUiIdle, ensurePhase]);
 
@@ -309,8 +308,7 @@ function Ball({
           phaseTimerRef.current = 0;
           phaseDurationRef.current = TRAJECTORY_LEAD_SEC;
           setUiIdle(false);
-          onTrajectoryPhaseChange(true);
-          ensurePhase('pitch');
+          onTrajectoryPhaseChange(false);
         }
       }
       return;
@@ -323,6 +321,8 @@ function Ball({
           meshRef.current.visible = true;
           phaseRef.current = 'playing';
           phaseTimerRef.current = 0;
+          onTrajectoryPhaseChange(true);
+          ensurePhase('pitch');
         }
       }
       return;
@@ -493,5 +493,6 @@ export default function Canvas3D() {
     </div>
   );
 }
+
 
 
