@@ -5,18 +5,22 @@ import { formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
 function CountDisplay() {
-  const pitch = useStore(
-    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
-  );
-  if (!pitch) return null;
+  const { pitch, isUiIdle } = useStore((state) => {
+    const atBat = state.atBats[state.currentAtBatIndex];
+    return {
+      pitch: atBat?.pitches[state.currentPitchIndex],
+      isUiIdle: state.isUiIdle,
+    };
+  });
+
+  const balls = isUiIdle ? 0 : pitch?.postCount.balls ?? 0;
+  const strikes = isUiIdle ? 0 : pitch?.postCount.strikes ?? 0;
+  const outs = isUiIdle ? 0 : pitch?.outsAfter ?? 0;
+
   return (
     <div className="count-card">
       <div className="count-title">カウント</div>
-      <CountDots
-        balls={pitch.postCount.balls}
-        strikes={pitch.postCount.strikes}
-        outs={pitch.outsAfter}
-      />
+      <CountDots balls={balls} strikes={strikes} outs={outs} />
     </div>
   );
 }
