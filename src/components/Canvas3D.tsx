@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, PerspectiveCamera } from '@react-three/drei';
 import { useEffect, useMemo, useRef } from 'react';
+import type React from 'react';
 import * as THREE from 'three';
 import { getPositionAtTime } from '../engine/physics';
 import type { AtBat, Pitch } from '../engine/statcast.types';
@@ -68,89 +69,7 @@ function BatterBox({ x }: { x: number }) {
 }
 
 function FieldElements() {
-  const plateShape = useMemo(() => {
-    const shape = new THREE.Shape();
-    // ホームベース（幅=17in=1.4167ftに合わせたおおよそ）
-    shape.moveTo(-0.708, 0);
-    shape.lineTo(0.708, 0);
-    shape.lineTo(0.708, -0.708);
-    shape.lineTo(0, -1.416);
-    shape.lineTo(-0.708, -0.708);
-    shape.closePath();
-    return shape;
-  }, []);
-
-  const homePlate = useMemo(() => new THREE.ShapeGeometry(plateShape), [plateShape]);
-  const baseLineSegments = useMemo(() => {
-    const y = 0.025;
-    const base = BASE_DISTANCE;
-    return [
-      [new THREE.Vector3(0, y, 0), new THREE.Vector3(base, y, -base)],
-      [new THREE.Vector3(0, y, 0), new THREE.Vector3(-base, y, -base)],
-      [new THREE.Vector3(base, y, -base), new THREE.Vector3(0, y, -base * 2)],
-      [new THREE.Vector3(-base, y, -base), new THREE.Vector3(0, y, -base * 2)],
-    ];
-  }, []);
-
-  return (
-    <group>
-      {/* 手前: 土 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 22]}>
-        <planeGeometry args={[120, 44]} />
-        <meshStandardMaterial color={PARK.dirt} roughness={1} />
-      </mesh>
-
-      {/* 中央: 芝 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -8]}>
-        <planeGeometry args={[120, 110]} />
-        <meshStandardMaterial color={PARK.grass} roughness={1} />
-      </mesh>
-
-      {/* 奥: フェンス/空 */}
-      <mesh position={[0, 12, -80]}>
-        <planeGeometry args={[120, 36]} />
-        <meshStandardMaterial color={PARK.deep} roughness={1} />
-      </mesh>
-
-      {/* ホームベース */}
-      <mesh rotation={[0, 0, 0]} position={[0, 0.01, 0]} geometry={homePlate}>
-        <meshStandardMaterial color={PARK.line} />
-      </mesh>
-
-      {/* 既存ライン */}
-      <mesh position={[0, 0.02, -1]}>
-        <boxGeometry args={[1.5, 0.05, 1.5]} />
-        <meshStandardMaterial color={PARK.line} opacity={0.65} transparent />
-      </mesh>
-      <mesh position={[0, 0.02, 0]}>
-        <boxGeometry args={[0.1, 0.05, 8]} />
-        <meshStandardMaterial color={PARK.line} opacity={0.4} transparent />
-      </mesh>
-
-      {/* ベースライン */}
-      {baseLineSegments.map((points, index) => (
-        <Line key={index} points={points} color={PARK.line} lineWidth={2} transparent opacity={0.55} />
-      ))}
-
-      {/* 各塁 */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[BASE_DISTANCE, 0.025, -BASE_DISTANCE]}>
-        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
-        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, -BASE_DISTANCE * 2]}>
-        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
-        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-BASE_DISTANCE, 0.025, -BASE_DISTANCE]}>
-        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
-        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
-      </mesh>
-
-      {/* バッターボックス */}
-      <BatterBox x={-3} />
-      <BatterBox x={3} />
-    </group>
-  );
+  return null;
 }
 
 /**
@@ -375,11 +294,22 @@ function SceneContents() {
 }
 
 export default function Canvas3D() {
+  const bgStyle: React.CSSProperties = {
+    backgroundImage: "url('/Stadium6.png')",
+    backgroundSize: 'cover',
+    backgroundPosition: 'center bottom',
+    backgroundRepeat: 'no-repeat',
+    backgroundColor: '#0b1c22',
+  };
+
   return (
-    <div className="canvas-wrapper">
-      <Canvas shadows camera={{ position: [0, 6, 12], fov: 45 }}>
-        <color attach="background" args={[0.933, 0.949, 1]} />
-        <fog attach="fog" args={[0xeef2ff, 40, 260]} />
+    <div className="canvas-wrapper" style={bgStyle}>
+      <Canvas
+        shadows
+        gl={{ alpha: true }}
+        style={{ background: 'transparent' }}
+        camera={{ position: [0, 6, 12], fov: 45 }}
+      >
         <PerspectiveCamera makeDefault position={[0, 6, 12]} fov={45} />
         <CameraRig />
         <SceneContents />

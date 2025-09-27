@@ -128,53 +128,67 @@ function BasesDisplay() {
   ].filter(Boolean) as string[];
   const description = labels.length > 0 ? `${labels.join('・')}に走者` : '走者なし';
   const ariaLabel = labels.length > 0 ? `${labels.join('、')}に走者` : '走者なし';
-  const baseFill = (isOccupied: boolean) => (isOccupied ? '#fde68a' : 'rgba(148, 163, 184, 0.15)');
-  const baseStroke = (isOccupied: boolean) => (isOccupied ? '#facc15' : 'rgba(226, 232, 240, 0.35)');
+  const baseFill = (isOccupied: boolean) => (isOccupied ? '#FACC15' : '#94a3b8');
+  const baseStroke = (isOccupied: boolean) => (isOccupied ? '#facc15' : 'rgba(148, 163, 184, 0.65)');
+  const baseOpacity = (isOccupied: boolean) => (isOccupied ? 0.95 : 0.35);
+
+  const cx = 35;
+  const cy = 35;
+  const size = 30;
+  const base = 6;
+  const OFF = {
+    first: { dx: 4, dy: 0 },
+    second: { dx: 0, dy: -4 },
+    third: { dx: -4, dy: 0 },
+  } as const;
+
+  const corners = {
+    first: { x: cx + size, y: cy },
+    second: { x: cx, y: cy - size },
+    third: { x: cx - size, y: cy },
+  } as const;
 
   return (
     <div className="bases-card">
       <div className="bases-title">走者状況</div>
       <svg className="bases-diamond" viewBox="0 0 70 70" role="img" aria-label={ariaLabel}>
         <polygon
-          points="35,5 65,35 35,65 5,35"
+          points={`${cx},${cy - size} ${cx + size},${cy} ${cx},${cy + size} ${cx - size},${cy}`}
           fill="rgba(15,23,42,0.6)"
           stroke="rgba(148, 163, 184, 0.45)"
           strokeWidth="2"
         />
         <rect
-          x={42}
-          y={42}
-          width={12}
-          height={12}
-          transform="rotate(45 48 48)"
+          x={corners.first.x - base / 2 + OFF.first.dx}
+          y={corners.first.y - base / 2 + OFF.first.dy}
+          width={base}
+          height={base}
           fill={baseFill(occupied.first)}
           stroke={baseStroke(occupied.first)}
           strokeWidth={occupied.first ? 2 : 1.5}
-          opacity={occupied.first ? 0.95 : 0.5}
+          opacity={baseOpacity(occupied.first)}
           rx={1}
         />
         <rect
-          x={29}
-          y={16}
-          width={12}
-          height={12}
-          transform="rotate(45 35 22)"
+          x={corners.second.x - base / 2 + OFF.second.dx}
+          y={corners.second.y - base / 2 + OFF.second.dy}
+          width={base}
+          height={base}
           fill={baseFill(occupied.second)}
           stroke={baseStroke(occupied.second)}
           strokeWidth={occupied.second ? 2 : 1.5}
-          opacity={occupied.second ? 0.95 : 0.5}
+          opacity={baseOpacity(occupied.second)}
           rx={1}
         />
         <rect
-          x={16}
-          y={42}
-          width={12}
-          height={12}
-          transform="rotate(45 22 48)"
+          x={corners.third.x - base / 2 + OFF.third.dx}
+          y={corners.third.y - base / 2 + OFF.third.dy}
+          width={base}
+          height={base}
           fill={baseFill(occupied.third)}
           stroke={baseStroke(occupied.third)}
           strokeWidth={occupied.third ? 2 : 1.5}
-          opacity={occupied.third ? 0.95 : 0.5}
+          opacity={baseOpacity(occupied.third)}
           rx={1}
         />
       </svg>
@@ -196,5 +210,3 @@ export default function Hud() {
     </div>
   );
 }
-
-
