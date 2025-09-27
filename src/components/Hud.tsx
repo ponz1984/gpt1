@@ -1,36 +1,46 @@
 import { useMemo } from 'react';
-import { useStore } from '../state/useStore';
+import { useStore, selectDisplayPitch, selectDisplayAtBat, selectCurrentPitch } from '../state/useStore';
 import CountDots from './CountDots';
 import { formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
 function CountDisplay() {
-  const { pitch, isUiIdle } = useStore((state) => {
-    const atBat = state.atBats[state.currentAtBatIndex];
-    return {
-      pitch: atBat?.pitches[state.currentPitchIndex],
-      isUiIdle: state.isUiIdle,
-    };
-  });
+  const { phase, displayPitch, lastVisibleCount } = useStore((state) => ({
+    phase: state.phase,
+    displayPitch: selectDisplayPitch(state),
+    lastVisibleCount: state.lastVisibleCount,
+  }));
 
-  const balls = isUiIdle ? 0 : pitch?.postCount.balls ?? 0;
-  const strikes = isUiIdle ? 0 : pitch?.postCount.strikes ?? 0;
-  const outs = isUiIdle ? 0 : pitch?.outsAfter ?? 0;
+  if (phase === 'preFirst' || phase === 'inningBreak') {
+    return null;
+  }
+
+  const countSource = displayPitch
+    ? {
+        balls: displayPitch.postCount.balls,
+        strikes: displayPitch.postCount.strikes,
+        outs: displayPitch.outsAfter,
+      }
+    : lastVisibleCount;
+
+  if (!countSource) {
+    return null;
+  }
 
   return (
     <div className="count-card">
       <div className="count-title">カウント</div>
-      <CountDots balls={balls} strikes={strikes} outs={outs} />
+      <CountDots balls={countSource.balls} strikes={countSource.strikes} outs={countSource.outs} />
     </div>
   );
 }
 
 function PitchInfo() {
-  const { atBat, pitch, meta } = useStore((state) => {
-    const atBat = state.atBats[state.currentAtBatIndex];
-    const pitch = atBat?.pitches[state.currentPitchIndex];
-    return { atBat, pitch, meta: state.meta };
-  });
+  const { atBat, pitch, meta } = useStore((state) => ({
+    atBat: selectDisplayAtBat(state),
+    pitch: selectDisplayPitch(state),
+    meta: state.meta,
+  }));
 
   if (!pitch || !atBat || !meta) return null;
 
@@ -45,12 +55,19 @@ function PitchInfo() {
 }
 
 function ScoreBoard() {
-  const meta = useStore((state) => state.meta);
-  const pitch = useStore(
-    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
-  );
-  const inning = useStore((state) => state.atBats[state.currentAtBatIndex]?.inning);
-  const half = useStore((state) => state.atBats[state.currentAtBatIndex]?.half);
+  const { meta, pitch, atBat } = useStore((state) => {
+    const displayPitch = selectDisplayPitch(state);
+    const displayAtBat = selectDisplayAtBat(state);
+    if (displayPitch && displayAtBat) {
+      return { meta: state.meta, pitch: displayPitch, atBat: displayAtBat };
+    }
+    const currentAtBat = state.atBats[state.currentAtBatIndex];
+    return {
+      meta: state.meta,
+      pitch: selectCurrentPitch(state),
+      atBat: currentAtBat,
+    };
+  });
 
   const teams = useMemo(() => {
     if (!meta) return null;
@@ -60,7 +77,7 @@ function ScoreBoard() {
     };
   }, [meta]);
 
-  if (!meta || !pitch || !teams || inning === undefined || !half) return null;
+  if (!meta || !pitch || !teams || !atBat || atBat.inning === undefined || !atBat.half) return null;
 
   // 投手名の解決優先順:
   // 1) pitch.pitcherLabel（各投球で直接持っている表示名）
@@ -89,7 +106,7 @@ function ScoreBoard() {
       <div className="scoreboard-sub">
         <div className="game-info">
           <div>{meta.gameDate}</div>
-          <div>{formatInning(inning, half)}</div>
+          <div>{formatInning(atBat.inning, atBat.half)}</div>
         </div>
         <div className="pitcher">投手: {pitcherName}</div>
       </div>
@@ -98,9 +115,7 @@ function ScoreBoard() {
 }
 
 function ResultBanner() {
-  const pitch = useStore(
-    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
-  );
+  const pitch = useStore((state) => selectDisplayPitch(state));
   if (!pitch) return null;
   const resultText = pitch.displayResult;
   return (
@@ -114,9 +129,7 @@ function ResultBanner() {
 }
 
 function BasesDisplay() {
-  const pitch = useStore(
-    (state) => state.atBats[state.currentAtBatIndex]?.pitches[state.currentPitchIndex]
-  );
+  const pitch = useStore((state) => selectDisplayPitch(state));
   if (!pitch) return null;
 
   const { first, second, third } = pitch.bases;
@@ -214,3 +227,4 @@ export default function Hud() {
     </div>
   );
 }
+

@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { parseCsv } from '../engine/parseCsv';
 import type { AtBat, GameMeta, ParsedGame, Pitch } from '../engine/statcast.types';
 
+export type Phase = 'preFirst' | 'pitch' | 'hold' | 'between' | 'inningBreak';
+
+type FrozenCount = { balls: number; strikes: number; outs: number };
+
 type CameraView = 'catcher' | 'umpire' | 'center';
 
 type StoreState = {
@@ -18,6 +22,8 @@ type StoreState = {
   showReleasePoint: boolean;
   showStrikeZone: boolean;
   isUiIdle: boolean;
+  phase: Phase;
+  lastVisibleCount?: FrozenCount;
   loadFromCsv: (text: string) => void;
   setError: (message?: string) => void;
   play: () => void;
@@ -29,6 +35,9 @@ type StoreState = {
   setCameraView: (view: CameraView) => void;
   toggleOverlay: (overlay: 'trajectory' | 'release' | 'zone') => void;
   setUiIdle: (v: boolean) => void;
+  startFirstPitch: () => void;
+  setPhase: (phase: Phase) => void;
+  setLastVisibleCount: (count?: FrozenCount) => void;
   reset: () => void;
 };
 
@@ -50,6 +59,8 @@ export const useStore = create<StoreState>((set, get) => ({
   showReleasePoint: true,
   showStrikeZone: true,
   isUiIdle: false,
+  phase: 'preFirst',
+  lastVisibleCount: undefined,
   loadFromCsv: (text: string) => {
     try {
       const parsed: ParsedGame = parseCsv(text);
@@ -59,12 +70,14 @@ export const useStore = create<StoreState>((set, get) => ({
         meta: parsed.meta,
         currentAtBatIndex: 0,
         currentPitchIndex: 0,
-        isPlaying: true,
+        isPlaying: false,
         error: undefined,
         showTrajectory: true,
         showReleasePoint: true,
         showStrikeZone: true,
         isUiIdle: false,
+        phase: 'preFirst',
+        lastVisibleCount: undefined,
       });
     } catch (err) {
       set({
@@ -79,12 +92,19 @@ export const useStore = create<StoreState>((set, get) => ({
         showReleasePoint: true,
         showStrikeZone: true,
         isUiIdle: false,
+        phase: 'preFirst',
+        lastVisibleCount: undefined,
       });
     }
   },
   setError: (message) => set({ error: message }),
   play: () => {
     if (get().pitches.length === 0) return;
+    const { phase, startFirstPitch } = get();
+    if (phase === 'preFirst') {
+      startFirstPitch();
+      return;
+    }
     set({ isPlaying: true });
   },
   pause: () => set({ isPlaying: false }),
@@ -141,6 +161,13 @@ export const useStore = create<StoreState>((set, get) => ({
       return { showStrikeZone: !state.showStrikeZone };
     }),
   setUiIdle: (v: boolean) => set({ isUiIdle: v }),
+  startFirstPitch: () => {
+    const { phase, pitches } = get();
+    if (phase !== 'preFirst' || pitches.length === 0) return;
+    set({ isPlaying: true, phase: 'pitch' });
+  },
+  setPhase: (phase) => set({ phase }),
+  setLastVisibleCount: (count) => set({ lastVisibleCount: count }),
   reset: () =>
     set({
       atBats: [],
@@ -154,8 +181,56 @@ export const useStore = create<StoreState>((set, get) => ({
       showReleasePoint: true,
       showStrikeZone: true,
       isUiIdle: false,
+      phase: 'preFirst',
+      lastVisibleCount: undefined,
     }),
 }));
 
 export type { CameraView };
+
+function getAtBat(state: StoreState, atBatIndex: number): AtBat | undefined {
+  if (atBatIndex < 0 || atBatIndex >= state.atBats.length) return undefined;
+  return state.atBats[atBatIndex];
+}
+
+function getPitchInAtBat(state: StoreState, atBatIndex: number, pitchIndex: number): Pitch | undefined {
+  const atBat = getAtBat(state, atBatIndex);
+  if (!atBat) return undefined;
+  if (pitchIndex < 0 || pitchIndex >= atBat.pitches.length) return undefined;
+  return atBat.pitches[pitchIndex];
+}
+
+function findPreviousPitch(state: StoreState, atBatIndex: number, pitchIndex: number): Pitch | undefined {
+  let a = atBatIndex;
+  let p = pitchIndex - 1;
+  if (p >= 0) {
+    return getPitchInAtBat(state, a, p);
+  }
+  for (let i = a - 1; i >= 0; i -= 1) {
+    const atBat = getAtBat(state, i);
+    if (atBat && atBat.pitches.length > 0) {
+      return atBat.pitches[atBat.pitches.length - 1];
+    }
+  }
+  return undefined;
+}
+
+export const selectCurrentPitch = (state: StoreState): Pitch | undefined =>
+  getPitchInAtBat(state, state.currentAtBatIndex, state.currentPitchIndex);
+
+export const selectPreviousPitch = (state: StoreState): Pitch | undefined =>
+  findPreviousPitch(state, state.currentAtBatIndex, state.currentPitchIndex);
+
+export const selectDisplayPitch = (state: StoreState): Pitch | undefined => {
+  if (state.phase === 'pitch' || state.phase === 'hold') {
+    return selectCurrentPitch(state) ?? selectPreviousPitch(state);
+  }
+  return selectPreviousPitch(state) ?? selectCurrentPitch(state);
+};
+
+export const selectDisplayAtBat = (state: StoreState): AtBat | undefined => {
+  const pitch = selectDisplayPitch(state);
+  if (!pitch) return undefined;
+  return getAtBat(state, pitch.atBatIndex);
+};
 

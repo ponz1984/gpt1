@@ -1,11 +1,12 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, PerspectiveCamera } from '@react-three/drei';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import * as THREE from 'three';
 import { getPositionAtTime } from '../engine/physics';
 import type { AtBat, Pitch } from '../engine/statcast.types';
 import { useStore } from '../state/useStore';
+import type { Phase } from '../state/useStore';
 import { getPitchColor } from '../utils/colors';
 
 const PARK = {
@@ -35,9 +36,9 @@ const BASE_DISTANCE = 18;
 const BASE_SIZE = 2.6;
 
 const FIRST_PITCH_DELAY_SEC = 2.0;
-const BETWEEN_PITCH_BLANK_SEC = 5.0;
+const BETWEEN_PITCH_BLANK_SEC = Math.max(0.5, 5.0 - 1.5);
 const INNING_CHANGE_BLANK_SEC = 8.0;
-const AFTER_PITCH_HOLD_SEC = 0.7;
+const AFTER_PITCH_HOLD_SEC = 0.7 + 1.5;
 const TRAJECTORY_LEAD_SEC = 0.05;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
@@ -160,6 +161,8 @@ function Ball({
     currentAtBatIndex,
     currentPitchIndex,
     setUiIdle,
+    setPhase,
+    setLastVisibleCount,
   } = useStore((state) => ({
     isPlaying: state.isPlaying,
     playbackSpeed: state.playbackSpeed,
@@ -168,7 +171,17 @@ function Ball({
     currentAtBatIndex: state.currentAtBatIndex,
     currentPitchIndex: state.currentPitchIndex,
     setUiIdle: state.setUiIdle,
+    setPhase: state.setPhase,
+    setLastVisibleCount: state.setLastVisibleCount,
   }));
+  const ensurePhase = useCallback(
+    (target: Phase) => {
+      if (useStore.getState().phase !== target) {
+        setPhase(target);
+      }
+    },
+    [setPhase]
+  );
   const timeRef = useRef(0);
   const phaseRef = useRef<'idle' | 'trajectoryLead' | 'playing' | 'hold' | 'waitingNext' | 'done'>('idle');
   const phaseTimerRef = useRef(0);
@@ -281,8 +294,9 @@ function Ball({
       phaseTimerRef.current = 0;
       setUiIdle(false);
       onTrajectoryPhaseChange(true);
+      ensurePhase('pitch');
     }
-  }, [pitch, isFirstPitch, onTrajectoryPhaseChange, setUiIdle]);
+  }, [pitch, isFirstPitch, onTrajectoryPhaseChange, setUiIdle, ensurePhase]);
 
   useFrame((_, delta) => {
     if (!pitch || !meshRef.current) return;
@@ -296,6 +310,7 @@ function Ball({
           phaseDurationRef.current = TRAJECTORY_LEAD_SEC;
           setUiIdle(false);
           onTrajectoryPhaseChange(true);
+          ensurePhase('pitch');
         }
       }
       return;
@@ -324,10 +339,15 @@ function Ball({
           meshRef.current.visible = false;
           onTrajectoryPhaseChange(false);
           setUiIdle(true);
+          const nextPhase: Phase = upcomingPitchContext.changesInning ? 'inningBreak' : 'between';
+          ensurePhase(nextPhase);
+          if (nextPhase === 'inningBreak') {
+            setLastVisibleCount(undefined);
+          }
           if (!awaitingNextPitchRef.current) {
             awaitingNextPitchRef.current = true;
             const waitDuration = upcomingPitchContext.nextPitchData
-              ? upcomingPitchContext.changesInning
+              ? nextPhase === 'inningBreak'
                 ? INNING_CHANGE_BLANK_SEC
                 : BETWEEN_PITCH_BLANK_SEC
               : 0;
@@ -375,9 +395,18 @@ function Ball({
     }
 
     if (nextTime >= pitch.duration - 1e-3) {
-      phaseRef.current = 'hold';
-      phaseTimerRef.current = 0;
-      phaseDurationRef.current = AFTER_PITCH_HOLD_SEC;
+      if (phaseRef.current !== 'hold') {
+        phaseRef.current = 'hold';
+        phaseTimerRef.current = 0;
+        phaseDurationRef.current = AFTER_PITCH_HOLD_SEC;
+        ensurePhase('hold');
+        setUiIdle(false);
+        setLastVisibleCount({
+          balls: pitch.postCount.balls,
+          strikes: pitch.postCount.strikes,
+          outs: pitch.outsAfter,
+        });
+      }
     }
   });
 
@@ -404,7 +433,7 @@ function CameraRig() {
 
 function SceneContents() {
   const [trajectoryPhaseOn, setTrajectoryPhaseOn] = useState(false);
-  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone, isUiIdle, setUiIdle } = useStore(
+  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone, isUiIdle, setUiIdle, phase } = useStore(
     (state) => {
       const atBat = state.atBats[state.currentAtBatIndex];
       return {
@@ -415,6 +444,7 @@ function SceneContents() {
         showStrikeZone: state.showStrikeZone,
         isUiIdle: state.isUiIdle,
         setUiIdle: state.setUiIdle,
+        phase: state.phase,
       };
     }
   );
@@ -423,6 +453,8 @@ function SceneContents() {
     setUiIdle(true);
   }, [setUiIdle]);
 
+  const allowVisuals = phase === 'pitch' || phase === 'hold';
+
   return (
     <group>
       <ambientLight intensity={0.6} />
@@ -430,8 +462,8 @@ function SceneContents() {
       <directionalLight position={[-20, 30, -20]} intensity={0.45} />
       <FieldElements />
       {showStrikeZone && <StrikeZone atBat={atBat} />}
-      {showTrajectory && trajectoryPhaseOn && !isUiIdle && <Trajectory pitch={pitch} />}
-      {showReleasePoint && !isUiIdle && <ReleaseMarker pitch={pitch} />}
+      {showTrajectory && trajectoryPhaseOn && !isUiIdle && allowVisuals && <Trajectory pitch={pitch} />}
+      {showReleasePoint && !isUiIdle && allowVisuals && <ReleaseMarker pitch={pitch} />}
       <Ball pitch={pitch} onTrajectoryPhaseChange={setTrajectoryPhaseOn} />
     </group>
   );
