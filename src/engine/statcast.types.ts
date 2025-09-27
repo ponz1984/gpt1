@@ -42,7 +42,7 @@ export type PitchRow = {
   description: string;
   events?: string;
   player_name: string;
-  batter: number;
+  batter: number | string;
   pitcher: number;
 };
 
@@ -94,7 +94,7 @@ export type Pitch = PitchRow & PitchDerived;
 
 export type AtBat = {
   id: string;
-  batterId: number;
+  batterId: number | undefined;
   batterLabel: string;
   inning: number;
   half: InningHalf;
@@ -117,3 +117,4 @@ export type ParsedGame = {
   pitches: Pitch[];
   meta: GameMeta;
 };
+
