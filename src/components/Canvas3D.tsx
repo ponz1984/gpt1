@@ -30,6 +30,9 @@ const CAMERA_PRESETS = {
   },
 } satisfies Record<string, { position: THREE.Vector3; target: THREE.Vector3 }>;
 
+const BASE_DISTANCE = 18;
+const BASE_SIZE = 2.6;
+
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
   // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
@@ -78,6 +81,16 @@ function FieldElements() {
   }, []);
 
   const homePlate = useMemo(() => new THREE.ShapeGeometry(plateShape), [plateShape]);
+  const baseLineSegments = useMemo(() => {
+    const y = 0.025;
+    const base = BASE_DISTANCE;
+    return [
+      [new THREE.Vector3(0, y, 0), new THREE.Vector3(base, y, -base)],
+      [new THREE.Vector3(0, y, 0), new THREE.Vector3(-base, y, -base)],
+      [new THREE.Vector3(base, y, -base), new THREE.Vector3(0, y, -base * 2)],
+      [new THREE.Vector3(-base, y, -base), new THREE.Vector3(0, y, -base * 2)],
+    ];
+  }, []);
 
   return (
     <group>
@@ -112,6 +125,25 @@ function FieldElements() {
       <mesh position={[0, 0.02, 0]}>
         <boxGeometry args={[0.1, 0.05, 8]} />
         <meshStandardMaterial color={PARK.line} opacity={0.4} transparent />
+      </mesh>
+
+      {/* ベースライン */}
+      {baseLineSegments.map((points, index) => (
+        <Line key={index} points={points} color={PARK.line} lineWidth={2} transparent opacity={0.55} />
+      ))}
+
+      {/* 各塁 */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[BASE_DISTANCE, 0.025, -BASE_DISTANCE]}>
+        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
+        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, -BASE_DISTANCE * 2]}>
+        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
+        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-BASE_DISTANCE, 0.025, -BASE_DISTANCE]}>
+        <planeGeometry args={[BASE_SIZE, BASE_SIZE]} />
+        <meshStandardMaterial color={PARK.line} opacity={0.75} transparent />
       </mesh>
 
       {/* バッターボックス */}
@@ -355,4 +387,5 @@ export default function Canvas3D() {
     </div>
   );
 }
+
 
