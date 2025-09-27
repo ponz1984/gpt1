@@ -34,12 +34,22 @@ export type PitchRow = {
   away_score: number;
   post_home_score?: number;
   post_away_score?: number;
+  /** 投球前に塁上へいる走者ID（存在しない場合は undefined） */
+  on_1b?: number;
+  on_2b?: number;
+  on_3b?: number;
   type: PitchTypeCode;
   description: string;
   events?: string;
   player_name: string;
   batter: number;
   pitcher: number;
+};
+
+export type BaseOccupancy = {
+  first?: number;
+  second?: number;
+  third?: number;
 };
 
 export type TrajectorySample = {
@@ -76,6 +86,8 @@ export type PitchDerived = {
   pitchLabel: string;
   /** 各投球時点の投手表示名（優先: row.player_name → meta.pitcherNames[id] → フォールバック） */
   pitcherLabel: string;
+  /** 投球後の塁状況（ID は次投球の on_* から推定） */
+  bases: BaseOccupancy;
 };
 
 export type Pitch = PitchRow & PitchDerived;
@@ -105,4 +117,3 @@ export type ParsedGame = {
   pitches: Pitch[];
   meta: GameMeta;
 };
-

@@ -7,7 +7,17 @@ export type CountResult = {
 };
 
 const FOUL_KEYWORDS = ['foul', 'foul_bunt'];
-const BALL_KEYWORDS = ['ball', 'intent_ball', 'pitchout', 'blocked_ball', 'automatic_ball'];
+const BALL_KEYWORDS = [
+  'ball',
+  'intent_ball',
+  'pitchout',
+  'blocked_ball',
+  'automatic_ball',
+  'pitch_timer_violation_on_pitcher',
+  'pitch_clock_violation_on_pitcher',
+  'pitcher_pitch_timer_violation',
+  'pitcher_pitch_clock_violation',
+];
 const STRIKE_KEYWORDS = [
   'called_strike',
   'swinging_strike',
@@ -17,6 +27,13 @@ const STRIKE_KEYWORDS = [
   'foul_tip',
   'foul_tip_strike',
   'bunt_foul_tip',
+  'automatic_strike',
+  'pitch_timer_violation_on_batter',
+  'pitch_clock_violation_on_batter',
+  'pitch_timer_violation_batter',
+  'pitch_clock_violation_batter',
+  'batter_pitch_timer_violation',
+  'batter_pitch_clock_violation',
 ];
 
 function includesKeyword(value: string | undefined, keywords: string[]): boolean {
@@ -37,7 +54,23 @@ function computeFromRule(row: PitchRow): CountResult {
   let strikes = prevStrikes;
   let isAtBatEnd = false;
 
-  if (row.type === 'B' || includesKeyword(description, BALL_KEYWORDS)) {
+  const isTimerOrClockViolation =
+    description.includes('pitch_timer_violation') ||
+    description.includes('pitch_clock_violation') ||
+    description.includes('time_violation');
+  const isBatterViolation =
+    isTimerOrClockViolation &&
+    (description.includes('batter') || description.includes('on_batter'));
+
+  if (isTimerOrClockViolation) {
+    if (isBatterViolation) {
+      strikes = Math.min(3, prevStrikes + 1);
+      if (strikes === 3) isAtBatEnd = true;
+    } else {
+      balls = Math.min(4, prevBalls + 1);
+      if (balls === 4) isAtBatEnd = true;
+    }
+  } else if (row.type === 'B' || includesKeyword(description, BALL_KEYWORDS)) {
     // 歩か死球の明確ケース
     if (description.includes('hit_by_pitch')) {
       balls = 4;
@@ -75,6 +108,9 @@ function computeFromRule(row: PitchRow): CountResult {
     }
     if (evLower.includes('strikeout')) {
       strikes = 3;
+      isAtBatEnd = true;
+    }
+    if (evLower.includes('catcher_interference')) {
       isAtBatEnd = true;
     }
   }
@@ -190,4 +226,5 @@ export function deriveOutsAfter(
 }
 
 export { clampOuts };
+
 

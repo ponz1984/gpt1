@@ -64,6 +64,30 @@ describe('derivePostCount', () => {
     expect(result.strikes).toBe(2);
     expect(result.isAtBatEnd).toBe(false);
   });
+
+  it('treats pitch timer violations on the batter as strikes', () => {
+    const violation = createRow({
+      balls: 1,
+      strikes: 1,
+      type: 'S',
+      description: 'pitch_timer_violation_on_batter',
+    });
+    const result = derivePostCount(violation, undefined);
+    expect(result.strikes).toBe(2);
+    expect(result.isAtBatEnd).toBe(false);
+  });
+
+  it('marks catcher interference as at-bat ending when no next row is present', () => {
+    const interference = createRow({
+      balls: 2,
+      strikes: 1,
+      type: 'B',
+      description: 'ball',
+      events: 'catcher_interference',
+    });
+    const result = derivePostCount(interference, undefined);
+    expect(result.isAtBatEnd).toBe(true);
+  });
 });
 
 describe('deriveOutsAfter', () => {

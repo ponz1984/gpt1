@@ -1,7 +1,14 @@
 import Papa from 'papaparse';
 import { deriveOutsAfter, derivePostCount } from './count';
 import { sampleTrajectory } from './physics';
-import type { AtBat, GameMeta, ParsedGame, Pitch, PitchRow } from './statcast.types';
+import type {
+  AtBat,
+  BaseOccupancy,
+  GameMeta,
+  ParsedGame,
+  Pitch,
+  PitchRow,
+} from './statcast.types';
 import { formatEvents } from '../utils/formatters';
 
 const REQUIRED_COLUMNS = [
@@ -49,6 +56,16 @@ function ensureRequiredColumns(columns: string[]): void {
 
 function toPitchRow(raw: Papa.ParseResult<unknown>['data'][number]): PitchRow {
   const row = raw as Record<string, string>;
+  const parseRunnerId = (value: string | undefined): number | undefined => {
+    if (!value || value.trim() === '') return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const normalizeHalf = (value: string | undefined): PitchRow['inning_topbot'] => {
+    const upper = (value ?? '').trim().toLowerCase();
+    if (upper === 'bot' || upper === 'bottom' || upper === 'b') return 'Bot';
+    return 'Top';
+  };
   return {
     game_date: row.game_date,
     game_pk: Number(row.game_pk),
@@ -74,13 +91,16 @@ function toPitchRow(raw: Papa.ParseResult<unknown>['data'][number]): PitchRow {
     strikes: Number(row.strikes),
     outs_when_up: Number(row.outs_when_up),
     inning: Number(row.inning),
-    inning_topbot: row.inning_topbot as PitchRow['inning_topbot'],
+    inning_topbot: normalizeHalf(row.inning_topbot),
     home_team: row.home_team,
     away_team: row.away_team,
     home_score: Number(row.home_score),
     away_score: Number(row.away_score),
     post_home_score: row.post_home_score ? Number(row.post_home_score) : undefined,
     post_away_score: row.post_away_score ? Number(row.post_away_score) : undefined,
+    on_1b: parseRunnerId(row.on_1b),
+    on_2b: parseRunnerId(row.on_2b),
+    on_3b: parseRunnerId(row.on_3b),
     type: row.type as PitchRow['type'],
     description: row.description,
     events: row.events || undefined,
@@ -118,6 +138,18 @@ function resolvePitcherLabel(row: PitchRow, pitcherNames: Map<number, string>): 
   return `投手 ${row.pitcher}`;
 }
 
+function resolveBases(
+  baseSource: PitchRow | undefined,
+  fallback: PitchRow
+): BaseOccupancy {
+  const source = baseSource ?? fallback;
+  return {
+    first: Number.isFinite(source.on_1b) ? source.on_1b : undefined,
+    second: Number.isFinite(source.on_2b) ? source.on_2b : undefined,
+    third: Number.isFinite(source.on_3b) ? source.on_3b : undefined,
+  };
+}
+
 function createPitch(
   row: PitchRow,
   order: number,
@@ -138,6 +170,7 @@ function createPitch(
   };
 
   const displayResult = formatEvents(row.events, row.description);
+  const baseState = resolveBases(nextInAtBat ?? nextAtBatFirst, row);
 
   return {
     ...row,
@@ -156,6 +189,7 @@ function createPitch(
     speedLabel: `${row.release_speed.toFixed(1)} mph`,
     pitchLabel: row.pitch_name || row.pitch_type,
     pitcherLabel: resolvePitcherLabel(row, pitcherNames),
+    bases: baseState,
   };
 }
 
@@ -265,4 +299,3 @@ export function parseCsv(text: string): ParsedGame {
 
   return { atBats, pitches, meta };
 }
-
