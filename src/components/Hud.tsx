@@ -1,24 +1,16 @@
 import { useMemo } from 'react';
-import {
-  useStore,
-  selectDisplayPitch,
-  selectDisplayAtBat,
-  selectCurrentPitch,
-  selectPreviousPitch,
-} from '../state/useStore';
-import type { Phase } from '../state/useStore';
-import type { Pitch, AtBat, GameMeta } from '../engine/statcast.types';
+import { useStore, selectDisplayPitch, selectDisplayAtBat, selectCurrentPitch } from '../state/useStore';
 import CountDots from './CountDots';
 import { formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
-type CountDisplayProps = {
-  phase: Phase;
-  pitch?: Pitch;
-  lastVisibleCount?: { balls: number; strikes: number; outs: number };
-};
+function CountDisplay() {
+  const { phase, displayPitch, lastVisibleCount } = useStore((state) => ({
+    phase: state.phase,
+    displayPitch: selectDisplayPitch(state),
+    lastVisibleCount: state.lastVisibleCount,
+  }));
 
-function CountDisplay({ phase, pitch, lastVisibleCount }: CountDisplayProps) {
   if (phase === 'preFirst' || phase === 'arming') {
     return null;
   }
@@ -32,16 +24,16 @@ function CountDisplay({ phase, pitch, lastVisibleCount }: CountDisplayProps) {
     );
   }
 
-  const countFromPitch = pitch
+  const countFromPitch = displayPitch
     ? {
-        balls: pitch.postCount.balls,
-        strikes: pitch.postCount.strikes,
-        outs: pitch.outsAfter,
+        balls: displayPitch.postCount.balls,
+        strikes: displayPitch.postCount.strikes,
+        outs: displayPitch.outsAfter,
       }
     : undefined;
 
   const countSource =
-    phase === 'pitch' || phase === 'hold' || phase === 'between'
+    phase === 'pitch' || phase === 'hold'
       ? countFromPitch ?? lastVisibleCount
       : lastVisibleCount ?? countFromPitch;
 
@@ -57,15 +49,15 @@ function CountDisplay({ phase, pitch, lastVisibleCount }: CountDisplayProps) {
   );
 }
 
-type PitchInfoProps = {
-  phase: Phase;
-  pitch?: Pitch;
-  atBat?: AtBat;
-  meta?: GameMeta;
-};
+function PitchInfo() {
+  const { atBat, pitch, meta, phase } = useStore((state) => ({
+    atBat: selectDisplayAtBat(state),
+    pitch: selectDisplayPitch(state),
+    meta: state.meta,
+    phase: state.phase,
+  }));
 
-function PitchInfo({ phase, pitch, atBat, meta }: PitchInfoProps) {
-  if (phase === 'preFirst' || phase === 'arming' || phase === 'inningBreak') return null;
+  if (phase === 'preFirst' || phase === 'arming') return null;
 
   if (!pitch || !atBat || !meta) return null;
 
@@ -139,11 +131,8 @@ function ScoreBoard() {
   );
 }
 
-type ResultBannerProps = {
-  pitch?: Pitch;
-};
-
-function ResultBanner({ pitch }: ResultBannerProps) {
+function ResultBanner() {
+  const pitch = useStore((state) => selectDisplayPitch(state));
   if (!pitch) return null;
   const resultText = pitch.displayResult;
   return (
@@ -156,11 +145,8 @@ function ResultBanner({ pitch }: ResultBannerProps) {
   );
 }
 
-type BasesDisplayProps = {
-  pitch?: Pitch;
-};
-
-function BasesDisplay({ pitch }: BasesDisplayProps) {
+function BasesDisplay() {
+  const pitch = useStore((state) => selectDisplayPitch(state));
   if (!pitch) return null;
 
   const { first, second, third } = pitch.bases;
@@ -246,42 +232,19 @@ function BasesDisplay({ pitch }: BasesDisplayProps) {
 }
 
 export default function Hud() {
-  const { phase, currentPitch, previousPitch, lastVisibleCount, atBats, meta } = useStore((state) => ({
-    phase: state.phase,
-    currentPitch: selectCurrentPitch(state),
-    previousPitch: selectPreviousPitch(state),
-    lastVisibleCount: state.lastVisibleCount,
-    atBats: state.atBats,
-    meta: state.meta,
-  }));
-
-  const lastPitch = previousPitch ?? currentPitch;
-  const displayPitch =
-    phase === 'pitch'
-      ? currentPitch ?? lastPitch
-      : phase === 'hold' || phase === 'between'
-        ? lastPitch
-        : undefined;
-
-  const displayAtBat = useMemo(() => {
-    if (!displayPitch) return undefined;
-    return atBats[displayPitch.atBatIndex];
-  }, [atBats, displayPitch]);
-
-  const basesPitch = displayPitch ?? lastPitch;
-
   return (
     <div className="hud-container">
       <ScoreBoard />
       <div className="hud-lower">
-        <CountDisplay phase={phase} pitch={displayPitch} lastVisibleCount={lastVisibleCount} />
-        <BasesDisplay pitch={basesPitch} />
-        <PitchInfo phase={phase} pitch={displayPitch} atBat={displayAtBat} meta={meta} />
+        <CountDisplay />
+        <BasesDisplay />
+        <PitchInfo />
       </div>
-      <ResultBanner pitch={displayPitch} />
+      <ResultBanner />
     </div>
   );
 }
+
 
 
 
