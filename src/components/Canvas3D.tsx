@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Line, PerspectiveCamera } from '@react-three/drei';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import * as THREE from 'three';
 import { getPositionAtTime } from '../engine/physics';
@@ -35,8 +35,10 @@ const BASE_DISTANCE = 18;
 const BASE_SIZE = 2.6;
 
 const FIRST_PITCH_DELAY_SEC = 2.0;
-const BETWEEN_PITCH_DELAY_SEC = 5.0;
-const INNING_CHANGE_EXTRA_SEC = 2.0;
+const BETWEEN_PITCH_BLANK_SEC = 5.0;
+const INNING_CHANGE_BLANK_SEC = 8.0;
+const AFTER_PITCH_HOLD_SEC = 0.7;
+const TRAJECTORY_LEAD_SEC = 0.05;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
@@ -142,24 +144,38 @@ function ReleaseMarker({ pitch }: { pitch?: Pitch }) {
   );
 }
 
-function Ball({ pitch }: { pitch?: Pitch }) {
+function Ball({
+  pitch,
+  onTrajectoryPhaseChange,
+}: {
+  pitch?: Pitch;
+  onTrajectoryPhaseChange: (on: boolean) => void;
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { isPlaying, playbackSpeed, nextPitch, atBats, currentAtBatIndex, currentPitchIndex } = useStore(
-    (state) => ({
-      isPlaying: state.isPlaying,
-      playbackSpeed: state.playbackSpeed,
-      nextPitch: state.nextPitch,
-      atBats: state.atBats,
-      currentAtBatIndex: state.currentAtBatIndex,
-      currentPitchIndex: state.currentPitchIndex,
-    })
-  );
+  const {
+    isPlaying,
+    playbackSpeed,
+    nextPitch,
+    atBats,
+    currentAtBatIndex,
+    currentPitchIndex,
+    setUiIdle,
+  } = useStore((state) => ({
+    isPlaying: state.isPlaying,
+    playbackSpeed: state.playbackSpeed,
+    nextPitch: state.nextPitch,
+    atBats: state.atBats,
+    currentAtBatIndex: state.currentAtBatIndex,
+    currentPitchIndex: state.currentPitchIndex,
+    setUiIdle: state.setUiIdle,
+  }));
   const timeRef = useRef(0);
-  const waitRef = useRef(0);
-  const waitingRef = useRef(false);
-  const waitDurationRef = useRef(0.9);
-  const waitActionRef = useRef<'first' | 'nextPitch' | null>(null);
-  const firstPitchDelayDoneRef = useRef(false);
+  const phaseRef = useRef<'idle' | 'trajectoryLead' | 'playing' | 'hold' | 'waitingNext' | 'done'>('idle');
+  const phaseTimerRef = useRef(0);
+  const phaseDurationRef = useRef(0);
+  const pendingIdleRef = useRef<number | null>(null);
+  const awaitingNextPitchRef = useRef(false);
+  const firstPitchDelayHandledRef = useRef(false);
 
   // 効果音
   const ballSfxRef = useRef<HTMLAudioElement | null>(null);
@@ -227,51 +243,102 @@ function Ball({ pitch }: { pitch?: Pitch }) {
 
   useEffect(() => {
     timeRef.current = 0;
-    waitRef.current = 0;
-    waitingRef.current = false;
-    waitActionRef.current = null;
+    phaseTimerRef.current = 0;
+    phaseDurationRef.current = 0;
+    awaitingNextPitchRef.current = false;
+
     if (!meshRef.current) return;
 
     if (!pitch) {
       meshRef.current.visible = false;
+      setUiIdle(true);
+      onTrajectoryPhaseChange(false);
       return;
     }
 
     const first = pitch.samples[0];
     const pos = worldFromSample(first);
     meshRef.current.position.copy(pos);
-    meshRef.current.visible = true;
+    meshRef.current.visible = false;
 
-    if (isFirstPitch && !firstPitchDelayDoneRef.current) {
-      waitingRef.current = true;
-      waitDurationRef.current = FIRST_PITCH_DELAY_SEC;
-      waitActionRef.current = 'first';
-      meshRef.current.visible = false;
+    let idleDuration = pendingIdleRef.current ?? 0;
+    pendingIdleRef.current = null;
+
+    if (isFirstPitch && !firstPitchDelayHandledRef.current) {
+      idleDuration = Math.max(idleDuration, FIRST_PITCH_DELAY_SEC);
+      firstPitchDelayHandledRef.current = true;
     }
-  }, [pitch, isFirstPitch]);
+
+    if (idleDuration > 0) {
+      phaseRef.current = 'idle';
+      phaseDurationRef.current = idleDuration;
+      phaseTimerRef.current = 0;
+      setUiIdle(true);
+      onTrajectoryPhaseChange(false);
+    } else {
+      phaseRef.current = 'trajectoryLead';
+      phaseDurationRef.current = TRAJECTORY_LEAD_SEC;
+      phaseTimerRef.current = 0;
+      setUiIdle(false);
+      onTrajectoryPhaseChange(true);
+    }
+  }, [pitch, isFirstPitch, onTrajectoryPhaseChange, setUiIdle]);
 
   useFrame((_, delta) => {
     if (!pitch || !meshRef.current) return;
-    if (waitingRef.current) {
-      waitRef.current += delta;
-      if (waitRef.current >= waitDurationRef.current && isPlaying) {
-        waitingRef.current = false;
-        waitRef.current = 0;
-        const action = waitActionRef.current;
-        waitActionRef.current = null;
-        if (action === 'first') {
-          firstPitchDelayDoneRef.current = true;
-          meshRef.current.visible = true;
-        } else if (action === 'nextPitch') {
-          meshRef.current.visible = true;
-          nextPitch();
+
+    if (phaseRef.current === 'idle') {
+      if (isPlaying) {
+        phaseTimerRef.current += delta;
+        if (phaseTimerRef.current >= phaseDurationRef.current) {
+          phaseRef.current = 'trajectoryLead';
+          phaseTimerRef.current = 0;
+          phaseDurationRef.current = TRAJECTORY_LEAD_SEC;
+          setUiIdle(false);
+          onTrajectoryPhaseChange(true);
         }
       }
       return;
     }
 
-    const baseSpeedFactor = Math.max(0.4, pitch.release_speed / 90);
-    const scaledDelta = delta * playbackSpeed * baseSpeedFactor;
+    if (phaseRef.current === 'trajectoryLead') {
+      if (isPlaying) {
+        phaseTimerRef.current += delta;
+        if (phaseTimerRef.current >= TRAJECTORY_LEAD_SEC) {
+          meshRef.current.visible = true;
+          phaseRef.current = 'playing';
+          phaseTimerRef.current = 0;
+        }
+      }
+      return;
+    }
+
+    if (phaseRef.current === 'waitingNext' || phaseRef.current === 'done') {
+      return;
+    }
+
+    if (phaseRef.current === 'hold') {
+      if (isPlaying) {
+        phaseTimerRef.current += delta;
+        if (phaseTimerRef.current >= AFTER_PITCH_HOLD_SEC) {
+          meshRef.current.visible = false;
+          onTrajectoryPhaseChange(false);
+          setUiIdle(true);
+          if (!awaitingNextPitchRef.current) {
+            awaitingNextPitchRef.current = true;
+            const waitDuration = upcomingPitchContext.nextPitchData
+              ? upcomingPitchContext.changesInning
+                ? INNING_CHANGE_BLANK_SEC
+                : BETWEEN_PITCH_BLANK_SEC
+              : 0;
+            pendingIdleRef.current = waitDuration;
+            phaseRef.current = upcomingPitchContext.nextPitchData ? 'waitingNext' : 'done';
+            nextPitch();
+          }
+        }
+      }
+      return;
+    }
 
     if (!isPlaying && timeRef.current === 0) {
       const start = worldFromSample(pitch.samples[0]);
@@ -283,13 +350,15 @@ function Ball({ pitch }: { pitch?: Pitch }) {
       return;
     }
 
+    const baseSpeedFactor = Math.max(0.4, pitch.release_speed / 90);
+    const scaledDelta = delta * playbackSpeed * baseSpeedFactor;
+
     const nextTime = Math.min(pitch.duration, timeRef.current + scaledDelta);
     timeRef.current = nextTime;
     const sample = getPositionAtTime(pitch.samples, nextTime);
     const position = worldFromSample(sample);
     meshRef.current.position.copy(position);
 
-    // 捕手到達直前で SFX（1回だけ）
     const soundLead = 0.03;
     const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
     if (sfxArmedRef.current && timeRef.current >= triggerTime) {
@@ -306,12 +375,9 @@ function Ball({ pitch }: { pitch?: Pitch }) {
     }
 
     if (nextTime >= pitch.duration - 1e-3) {
-      waitingRef.current = true;
-      waitRef.current = 0;
-      waitDurationRef.current =
-        BETWEEN_PITCH_DELAY_SEC + (upcomingPitchContext.changesInning ? INNING_CHANGE_EXTRA_SEC : 0);
-      waitActionRef.current = 'nextPitch';
-      meshRef.current.visible = false;
+      phaseRef.current = 'hold';
+      phaseTimerRef.current = 0;
+      phaseDurationRef.current = AFTER_PITCH_HOLD_SEC;
     }
   });
 
@@ -337,16 +403,25 @@ function CameraRig() {
 }
 
 function SceneContents() {
-  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone } = useStore((state) => {
-    const atBat = state.atBats[state.currentAtBatIndex];
-    return {
-      atBat,
-      pitch: atBat?.pitches[state.currentPitchIndex],
-      showTrajectory: state.showTrajectory,
-      showReleasePoint: state.showReleasePoint,
-      showStrikeZone: state.showStrikeZone,
-    };
-  });
+  const [trajectoryPhaseOn, setTrajectoryPhaseOn] = useState(false);
+  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone, isUiIdle, setUiIdle } = useStore(
+    (state) => {
+      const atBat = state.atBats[state.currentAtBatIndex];
+      return {
+        atBat,
+        pitch: atBat?.pitches[state.currentPitchIndex],
+        showTrajectory: state.showTrajectory,
+        showReleasePoint: state.showReleasePoint,
+        showStrikeZone: state.showStrikeZone,
+        isUiIdle: state.isUiIdle,
+        setUiIdle: state.setUiIdle,
+      };
+    }
+  );
+
+  useEffect(() => {
+    setUiIdle(true);
+  }, [setUiIdle]);
 
   return (
     <group>
@@ -355,9 +430,9 @@ function SceneContents() {
       <directionalLight position={[-20, 30, -20]} intensity={0.45} />
       <FieldElements />
       {showStrikeZone && <StrikeZone atBat={atBat} />}
-      {showTrajectory && <Trajectory pitch={pitch} />}
-      {showReleasePoint && <ReleaseMarker pitch={pitch} />}
-      <Ball pitch={pitch} />
+      {showTrajectory && trajectoryPhaseOn && !isUiIdle && <Trajectory pitch={pitch} />}
+      {showReleasePoint && !isUiIdle && <ReleaseMarker pitch={pitch} />}
+      <Ball pitch={pitch} onTrajectoryPhaseChange={setTrajectoryPhaseOn} />
     </group>
   );
 }
@@ -386,4 +461,5 @@ export default function Canvas3D() {
     </div>
   );
 }
+
 
