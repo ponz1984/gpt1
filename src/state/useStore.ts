@@ -17,6 +17,7 @@ type StoreState = {
   showTrajectory: boolean;
   showReleasePoint: boolean;
   showStrikeZone: boolean;
+  isUiIdle: boolean;
   loadFromCsv: (text: string) => void;
   setError: (message?: string) => void;
   play: () => void;
@@ -27,6 +28,7 @@ type StoreState = {
   setPlaybackSpeed: (speed: number) => void;
   setCameraView: (view: CameraView) => void;
   toggleOverlay: (overlay: 'trajectory' | 'release' | 'zone') => void;
+  setUiIdle: (v: boolean) => void;
   reset: () => void;
 };
 
@@ -47,6 +49,7 @@ export const useStore = create<StoreState>((set, get) => ({
   showTrajectory: true,
   showReleasePoint: true,
   showStrikeZone: true,
+  isUiIdle: false,
   loadFromCsv: (text: string) => {
     try {
       const parsed: ParsedGame = parseCsv(text);
@@ -61,6 +64,7 @@ export const useStore = create<StoreState>((set, get) => ({
         showTrajectory: true,
         showReleasePoint: true,
         showStrikeZone: true,
+        isUiIdle: false,
       });
     } catch (err) {
       set({
@@ -74,6 +78,7 @@ export const useStore = create<StoreState>((set, get) => ({
         showTrajectory: true,
         showReleasePoint: true,
         showStrikeZone: true,
+        isUiIdle: false,
       });
     }
   },
@@ -135,6 +140,7 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       return { showStrikeZone: !state.showStrikeZone };
     }),
+  setUiIdle: (v: boolean) => set({ isUiIdle: v }),
   reset: () =>
     set({
       atBats: [],
@@ -147,7 +153,9 @@ export const useStore = create<StoreState>((set, get) => ({
       showTrajectory: true,
       showReleasePoint: true,
       showStrikeZone: true,
+      isUiIdle: false,
     }),
 }));
 
 export type { CameraView };
+
