@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { parseCsv } from '../engine/parseCsv';
 import type { AtBat, GameMeta, ParsedGame, Pitch } from '../engine/statcast.types';
 
-export type Phase = 'preFirst' | 'pitch' | 'hold' | 'between' | 'inningBreak';
+export type Phase = 'preFirst' | 'arming' | 'pitch' | 'hold' | 'between' | 'inningBreak';
 
 type FrozenCount = { balls: number; strikes: number; outs: number };
 
@@ -164,7 +164,7 @@ export const useStore = create<StoreState>((set, get) => ({
   startFirstPitch: () => {
     const { phase, pitches } = get();
     if (phase !== 'preFirst' || pitches.length === 0) return;
-    set({ isPlaying: true, phase: 'pitch' });
+    set({ isPlaying: true, phase: 'arming' });
   },
   setPhase: (phase) => set({ phase }),
   setLastVisibleCount: (count) => set({ lastVisibleCount: count }),
