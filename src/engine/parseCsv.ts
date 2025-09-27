@@ -66,6 +66,8 @@ function toPitchRow(raw: Papa.ParseResult<unknown>['data'][number]): PitchRow {
     if (upper === 'bot' || upper === 'bottom' || upper === 'b') return 'Bot';
     return 'Top';
   };
+  const rawBatter = (row.batter ?? '').trim();
+  const batter = /^\d+$/.test(rawBatter) ? Number(rawBatter) : rawBatter;
   return {
     game_date: row.game_date,
     game_pk: Number(row.game_pk),
@@ -105,7 +107,7 @@ function toPitchRow(raw: Papa.ParseResult<unknown>['data'][number]): PitchRow {
     description: row.description,
     events: row.events || undefined,
     player_name: row.player_name,
-    batter: Number(row.batter),
+    batter,
     pitcher: Number(row.pitcher),
   };
 }
@@ -215,10 +217,20 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
   groups.forEach((group, groupIndex) => {
     const first = group[0];
     const nextGroup = groups[groupIndex + 1];
+    const trimmedBatterName =
+      typeof first.batter === 'string' ? first.batter.trim() : undefined;
+    const batterLabel =
+      trimmedBatterName && trimmedBatterName.length > 0
+        ? trimmedBatterName
+        : `打者 ${first.batter}`;
+    const batterId =
+      typeof first.batter === 'number' && Number.isFinite(first.batter)
+        ? first.batter
+        : undefined;
     const atBat: AtBat = {
       id: `${first.game_pk}-${first.at_bat_number}`,
-      batterId: first.batter,
-      batterLabel: `打者 ${first.batter}`,
+      batterId,
+      batterLabel,
       inning: first.inning,
       half: first.inning_topbot,
       pitches: [],
@@ -299,3 +311,4 @@ export function parseCsv(text: string): ParsedGame {
 
   return { atBats, pitches, meta };
 }
+
