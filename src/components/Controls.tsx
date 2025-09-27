@@ -17,7 +17,23 @@ const OVERLAY_OPTIONS: { key: OverlayKey; label: string }[] = [
 ];
 
 export default function Controls() {
-  const { isPlaying, play, pause, nextPitch, previousPitch, playbackSpeed, setPlaybackSpeed, cameraView, setCameraView, showTrajectory, showReleasePoint, showStrikeZone, toggleOverlay } = useStore((state) => ({
+  const {
+    isPlaying,
+    play,
+    pause,
+    nextPitch,
+    previousPitch,
+    playbackSpeed,
+    setPlaybackSpeed,
+    cameraView,
+    setCameraView,
+    showTrajectory,
+    showReleasePoint,
+    showStrikeZone,
+    toggleOverlay,
+    phase,
+    startFirstPitch,
+  } = useStore((state) => ({
     isPlaying: state.isPlaying,
     play: state.play,
     pause: state.pause,
@@ -31,6 +47,8 @@ export default function Controls() {
     showReleasePoint: state.showReleasePoint,
     showStrikeZone: state.showStrikeZone,
     toggleOverlay: state.toggleOverlay,
+    phase: state.phase,
+    startFirstPitch: state.startFirstPitch,
   }));
 
   const handlePlayPause = useCallback(() => {
@@ -46,6 +64,13 @@ export default function Controls() {
 
   return (
     <div className="controls-container">
+      {phase === 'preFirst' && (
+        <div className="controls-row">
+          <button type="button" onClick={startFirstPitch} className="control-button primary">
+            最初の投球をはじめる
+          </button>
+        </div>
+      )}
       <div className="controls-row">
         <button type="button" onClick={previousPitch} className="control-button">
           ◀ 前の投球
@@ -101,3 +126,4 @@ export default function Controls() {
     </div>
   );
 }
+
