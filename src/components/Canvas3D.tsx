@@ -41,6 +41,7 @@ const INNING_CHANGE_BLANK_SEC = 8.0;
 const AFTER_PITCH_HOLD_SEC = 0.7 + 1.5;
 const TRAJECTORY_LEAD_SEC = 0.05;
 const TRAIL_DELAY_S = 0.12;
+const EPS = 1e-4;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
@@ -124,41 +125,34 @@ function StrikeZone({ atBat }: { atBat?: AtBat }) {
 function Trajectory({ pitch }: { pitch?: Pitch }) {
   const playbackTime = useStore((state) => state.playbackTime);
 
-  const samplePoints = useMemo(() => {
+  const points = useMemo(() => {
     if (!pitch) return [];
-    return pitch.samples.map((sample) => ({ t: sample.t, position: worldFromSample(sample) }));
-  }, [pitch]);
+    const samples = pitch.samples;
+    if (samples.length === 0) return [];
 
-  const visiblePoints = useMemo(() => {
-    if (!pitch) return [];
-    const visibleT = Math.max(0, playbackTime - TRAIL_DELAY_S);
-    if (visibleT <= 0) return [];
+    const tVisible = Math.max(0, playbackTime - TRAIL_DELAY_S);
+    const dur = Math.max(EPS, pitch.duration);
+    const progress = Math.min(1, tVisible / dur);
 
-    const collected: THREE.Vector3[] = [];
-    let lastIncludedT = -1;
+    const N = samples.length;
+    const lastIdx = Math.min(N - 1, Math.max(1, Math.floor(progress * (N - 1))));
+    const visible = samples.slice(0, lastIdx + 1);
 
-    for (const sample of samplePoints) {
-      if (sample.t <= visibleT) {
-        collected.push(sample.position);
-        lastIncludedT = sample.t;
-      } else {
-        break;
-      }
+    const showFull = playbackTime >= dur - EPS;
+    const samplesForLine = showFull ? samples : visible;
+
+    if (samplesForLine.length < 2) {
+      const p0 = worldFromSample(samples[0]);
+      const current = getPositionAtTime(samples, Math.min(playbackTime, dur));
+      const pCur = worldFromSample(current);
+      return [p0, pCur];
     }
 
-    const finalSampleT = samplePoints[samplePoints.length - 1]?.t ?? 0;
-    if (visibleT < finalSampleT - 1e-4 && visibleT > lastIncludedT + 1e-4) {
-      const interpolated = worldFromSample(getPositionAtTime(pitch.samples, visibleT));
-      collected.push(interpolated);
-    }
+    return samplesForLine.map(worldFromSample);
+  }, [pitch, playbackTime]);
 
-    return collected;
-  }, [pitch, playbackTime, samplePoints]);
-
-  if (!pitch || visiblePoints.length < 2) return null;
-  return (
-    <Line points={visiblePoints} color={resolvePitchColor(pitch)} lineWidth={3} transparent opacity={0.9} />
-  );
+  if (!pitch || points.length < 2) return null;
+  return <Line points={points} color={resolvePitchColor(pitch)} lineWidth={3} transparent opacity={0.9} />;
 }
 
 function ReleaseMarker({ pitch }: { pitch?: Pitch }) {
@@ -535,6 +529,11 @@ export default function Canvas3D() {
     </div>
   );
 }
+
+
+
+
+
 
 
 
