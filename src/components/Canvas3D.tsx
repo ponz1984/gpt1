@@ -135,7 +135,7 @@ function Trajectory({ pitch }: { pitch?: Pitch }) {
     const progress = Math.min(1, tVisible / dur);
 
     const N = samples.length;
-    const lastIdx = Math.min(N - 1, Math.max(1, Math.floor(progress * (N - 1))));
+    const lastIdx = Math.min(N - 1, Math.max(1, Math.floor(progress * (N - 1)))); // 追従線を途中まで
     const visible = samples.slice(0, lastIdx + 1);
 
     const showFull = playbackTime >= dur - EPS;
@@ -248,11 +248,7 @@ function Ball({
     return `${pitch.events ?? ''} ${pitch.description ?? ''}`.toLowerCase();
   }, [pitch]);
 
-  const isStrikeout = useMemo(() => {
-    if (!pitch) return false;
-    return /strikeout/.test(surfaceText);
-  }, [pitch, surfaceText]);
-
+  // 接触判定：インプレーやファウル系のみ「接触あり」。三振は特別扱いしない（= 接触なし）
   const isContact = useMemo(() => {
     if (!pitch) return false;
     if (pitch.type === 'X') return true;
@@ -424,10 +420,11 @@ function Ball({
     const position = worldFromSample(sample);
     meshRef.current.position.copy(position);
 
+    // 捕手到達直前で SFX（1回だけ）— 接触時は bat、それ以外は ball
     const soundLead = 0.03;
     const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
     if (sfxArmedRef.current && timeRef.current >= triggerTime) {
-      const target = isStrikeout ? ballSfxRef.current : isContact ? batSfxRef.current : ballSfxRef.current;
+      const target = isContact ? batSfxRef.current : ballSfxRef.current;
       sfxArmedRef.current = false;
       if (target) {
         try {
