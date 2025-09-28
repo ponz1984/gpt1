@@ -66,7 +66,22 @@ function PitchInfo() {
       <div className="pitch-type">{pitch.pitchLabel}</div>
       <div className="pitch-speed">{pitch.speedLabel}</div>
       <div className="pitch-extra">球種コード: {pitch.pitch_type}</div>
-      <div className="pitch-batter">打者: {atBat.batterLabel}</div>
+    </div>
+  );
+}
+
+function BatterInfo() {
+  const { atBat, phase } = useStore((state) => ({
+    atBat: selectDisplayAtBat(state),
+    phase: state.phase,
+  }));
+
+  if (phase === 'preFirst' || phase === 'arming') return null;
+  if (!atBat) return null;
+
+  return (
+    <div className="batter-card">
+      <div className="batter-label">打者: {atBat.batterLabel}</div>
     </div>
   );
 }
@@ -239,11 +254,13 @@ export default function Hud() {
         <CountDisplay />
         <BasesDisplay />
         <PitchInfo />
+        <BatterInfo />
       </div>
       <ResultBanner />
     </div>
   );
 }
+
 
 
 
