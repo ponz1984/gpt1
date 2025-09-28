@@ -61,4 +61,3 @@ export function toFixed(value: number, digits: number = 1): string {
   return value.toFixed(d);
 }
 
-
