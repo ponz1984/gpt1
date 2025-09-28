@@ -22,29 +22,17 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
   triple_play: 'トリプルプレー',
 };
 
-const STRIKEOUT_SWING_KEYWORDS = [
-  'swinging_strike',
-  'swinging_strike_blocked',
-  'foul_tip',
-  'foul_tip_strike',
-  'bunt_foul_tip',
-  'missed_bunt',
-];
-
 export function formatEvents(events?: string, description?: string): string {
   if (events && events.trim() !== '') {
     const lower = events.toLowerCase();
-    if (lower.includes('strikeout')) {
-      const desc = description?.toLowerCase() ?? '';
-      const hasSwingKeyword = STRIKEOUT_SWING_KEYWORDS.some((keyword) => desc.includes(keyword));
-      return hasSwingKeyword ? '空振り三振' : '見逃し三振';
-    }
+    if (lower.includes('strikeout')) return '三振';
     const translated = EVENT_TRANSLATIONS[lower];
     if (translated) return translated;
     return events;
   }
   if (description && description.trim() !== '') {
     const lower = description.toLowerCase();
+    if (lower.includes('strikeout')) return '三振';
     if (lower.includes('called_strike')) return '見逃しストライク';
     if (lower.includes('swinging_strike')) return '空振りストライク';
     if (lower.includes('foul')) return 'ファウル';
@@ -72,4 +60,5 @@ export function toFixed(value: number, digits: number = 1): string {
   const d = Math.max(0, Math.floor(digits));
   return value.toFixed(d);
 }
+
 
