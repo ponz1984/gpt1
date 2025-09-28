@@ -36,10 +36,11 @@ const BASE_DISTANCE = 18;
 const BASE_SIZE = 2.6;
 
 const FIRST_PITCH_DELAY_SEC = 2.0;
-const BETWEEN_PITCH_BLANK_SEC = Math.max(0.5, 5.0 - 1.5);
+const BETWEEN_PITCH_BLANK_SEC = Math.max(0.5, 5.0 - 1.5 - 1.0);
 const INNING_CHANGE_BLANK_SEC = 8.0;
 const AFTER_PITCH_HOLD_SEC = 0.7 + 1.5;
 const TRAJECTORY_LEAD_SEC = 0.05;
+const TRAIL_DELAY_S = 0.12;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
@@ -121,13 +122,43 @@ function StrikeZone({ atBat }: { atBat?: AtBat }) {
 }
 
 function Trajectory({ pitch }: { pitch?: Pitch }) {
-  const linePoints = useMemo(() => {
+  const playbackTime = useStore((state) => state.playbackTime);
+
+  const samplePoints = useMemo(() => {
     if (!pitch) return [];
-    return pitch.samples.map((sample) => worldFromSample(sample));
+    return pitch.samples.map((sample) => ({ t: sample.t, position: worldFromSample(sample) }));
   }, [pitch]);
 
-  if (!pitch) return null;
-  return <Line points={linePoints} color={resolvePitchColor(pitch)} lineWidth={3} transparent opacity={0.9} />;
+  const visiblePoints = useMemo(() => {
+    if (!pitch) return [];
+    const visibleT = Math.max(0, playbackTime - TRAIL_DELAY_S);
+    if (visibleT <= 0) return [];
+
+    const collected: THREE.Vector3[] = [];
+    let lastIncludedT = -1;
+
+    for (const sample of samplePoints) {
+      if (sample.t <= visibleT) {
+        collected.push(sample.position);
+        lastIncludedT = sample.t;
+      } else {
+        break;
+      }
+    }
+
+    const finalSampleT = samplePoints[samplePoints.length - 1]?.t ?? 0;
+    if (visibleT < finalSampleT - 1e-4 && visibleT > lastIncludedT + 1e-4) {
+      const interpolated = worldFromSample(getPositionAtTime(pitch.samples, visibleT));
+      collected.push(interpolated);
+    }
+
+    return collected;
+  }, [pitch, playbackTime, samplePoints]);
+
+  if (!pitch || visiblePoints.length < 2) return null;
+  return (
+    <Line points={visiblePoints} color={resolvePitchColor(pitch)} lineWidth={3} transparent opacity={0.9} />
+  );
 }
 
 function ReleaseMarker({ pitch }: { pitch?: Pitch }) {
@@ -163,6 +194,7 @@ function Ball({
     setUiIdle,
     setPhase,
     setLastVisibleCount,
+    setPlaybackTime,
   } = useStore((state) => ({
     isPlaying: state.isPlaying,
     playbackSpeed: state.playbackSpeed,
@@ -173,6 +205,7 @@ function Ball({
     setUiIdle: state.setUiIdle,
     setPhase: state.setPhase,
     setLastVisibleCount: state.setLastVisibleCount,
+    setPlaybackTime: state.setPlaybackTime,
   }));
   const ensurePhase = useCallback(
     (target: Phase) => {
@@ -259,6 +292,7 @@ function Ball({
     phaseTimerRef.current = 0;
     phaseDurationRef.current = 0;
     awaitingNextPitchRef.current = false;
+    setPlaybackTime(0);
 
     if (!meshRef.current) return;
 
@@ -266,6 +300,7 @@ function Ball({
       meshRef.current.visible = false;
       setUiIdle(true);
       onTrajectoryPhaseChange(false);
+      setPlaybackTime(0);
       return;
     }
 
@@ -298,6 +333,8 @@ function Ball({
   }, [pitch, isFirstPitch, onTrajectoryPhaseChange, setUiIdle, ensurePhase]);
 
   useFrame((_, delta) => {
+    setPlaybackTime(timeRef.current);
+
     if (!pitch || !meshRef.current) return;
 
     if (phaseRef.current === 'idle') {
@@ -311,6 +348,7 @@ function Ball({
           onTrajectoryPhaseChange(false);
         }
       }
+      setPlaybackTime(timeRef.current);
       return;
     }
 
@@ -325,6 +363,7 @@ function Ball({
           ensurePhase('pitch');
         }
       }
+      setPlaybackTime(timeRef.current);
       return;
     }
 
@@ -357,6 +396,7 @@ function Ball({
           }
         }
       }
+      setPlaybackTime(timeRef.current);
       return;
     }
 
@@ -367,6 +407,7 @@ function Ball({
     }
 
     if (!isPlaying) {
+      setPlaybackTime(timeRef.current);
       return;
     }
 
@@ -375,6 +416,7 @@ function Ball({
 
     const nextTime = Math.min(pitch.duration, timeRef.current + scaledDelta);
     timeRef.current = nextTime;
+    setPlaybackTime(timeRef.current);
     const sample = getPositionAtTime(pitch.samples, nextTime);
     const position = worldFromSample(sample);
     meshRef.current.position.copy(position);
@@ -493,6 +535,7 @@ export default function Canvas3D() {
     </div>
   );
 }
+
 
 
 

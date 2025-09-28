@@ -16,6 +16,7 @@ type StoreState = {
   currentPitchIndex: number;
   isPlaying: boolean;
   playbackSpeed: number;
+  playbackTime: number;
   cameraView: CameraView;
   error?: string;
   showTrajectory: boolean;
@@ -38,6 +39,7 @@ type StoreState = {
   startFirstPitch: () => void;
   setPhase: (phase: Phase) => void;
   setLastVisibleCount: (count?: FrozenCount) => void;
+  setPlaybackTime: (t: number) => void;
   reset: () => void;
 };
 
@@ -53,6 +55,7 @@ export const useStore = create<StoreState>((set, get) => ({
   currentPitchIndex: 0,
   isPlaying: false,
   playbackSpeed: 1,
+  playbackTime: 0,
   cameraView: 'catcher',
   error: undefined,
   showTrajectory: true,
@@ -78,6 +81,7 @@ export const useStore = create<StoreState>((set, get) => ({
         isUiIdle: false,
         phase: 'preFirst',
         lastVisibleCount: undefined,
+        playbackTime: 0,
       });
     } catch (err) {
       set({
@@ -94,6 +98,7 @@ export const useStore = create<StoreState>((set, get) => ({
         isUiIdle: false,
         phase: 'preFirst',
         lastVisibleCount: undefined,
+        playbackTime: 0,
       });
     }
   },
@@ -116,12 +121,12 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     if (currentPitchIndex + 1 < atBat.pitches.length) {
-      set({ currentPitchIndex: currentPitchIndex + 1 });
+      set({ currentPitchIndex: currentPitchIndex + 1, playbackTime: 0 });
       return;
     }
     const nextAtBatIndex = currentAtBatIndex + 1;
     if (nextAtBatIndex < atBats.length) {
-      set({ currentAtBatIndex: nextAtBatIndex, currentPitchIndex: 0 });
+      set({ currentAtBatIndex: nextAtBatIndex, currentPitchIndex: 0, playbackTime: 0 });
     } else {
       set({ isPlaying: false });
     }
@@ -131,13 +136,17 @@ export const useStore = create<StoreState>((set, get) => ({
     const atBat = atBats[currentAtBatIndex];
     if (!atBat) return;
     if (currentPitchIndex > 0) {
-      set({ currentPitchIndex: currentPitchIndex - 1 });
+      set({ currentPitchIndex: currentPitchIndex - 1, playbackTime: 0 });
       return;
     }
     const prevAtBatIndex = currentAtBatIndex - 1;
     if (prevAtBatIndex >= 0) {
       const prevAtBat = atBats[prevAtBatIndex];
-      set({ currentAtBatIndex: prevAtBatIndex, currentPitchIndex: prevAtBat.pitches.length - 1 });
+      set({
+        currentAtBatIndex: prevAtBatIndex,
+        currentPitchIndex: prevAtBat.pitches.length - 1,
+        playbackTime: 0,
+      });
     }
   },
   jumpTo: (atBatIndex, pitchIndex) => {
@@ -146,7 +155,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const atBat = atBats[clampedAtBat];
     if (!atBat) return;
     const clampedPitch = Math.max(0, Math.min(atBat.pitches.length - 1, pitchIndex));
-    set({ currentAtBatIndex: clampedAtBat, currentPitchIndex: clampedPitch });
+    set({ currentAtBatIndex: clampedAtBat, currentPitchIndex: clampedPitch, playbackTime: 0 });
   },
   setPlaybackSpeed: (speed) => set({ playbackSpeed: speed }),
   setCameraView: (view) => set({ cameraView: view }),
@@ -168,6 +177,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   setPhase: (phase) => set({ phase }),
   setLastVisibleCount: (count) => set({ lastVisibleCount: count }),
+  setPlaybackTime: (t) => set({ playbackTime: t }),
   reset: () =>
     set({
       atBats: [],
@@ -183,6 +193,7 @@ export const useStore = create<StoreState>((set, get) => ({
       isUiIdle: false,
       phase: 'preFirst',
       lastVisibleCount: undefined,
+      playbackTime: 0,
     }),
 }));
 
