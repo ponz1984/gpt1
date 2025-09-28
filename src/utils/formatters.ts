@@ -22,9 +22,23 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
   triple_play: 'トリプルプレー',
 };
 
+const STRIKEOUT_SWING_KEYWORDS = [
+  'swinging_strike',
+  'swinging_strike_blocked',
+  'foul_tip',
+  'foul_tip_strike',
+  'bunt_foul_tip',
+  'missed_bunt',
+];
+
 export function formatEvents(events?: string, description?: string): string {
   if (events && events.trim() !== '') {
     const lower = events.toLowerCase();
+    if (lower.includes('strikeout')) {
+      const desc = description?.toLowerCase() ?? '';
+      const hasSwingKeyword = STRIKEOUT_SWING_KEYWORDS.some((keyword) => desc.includes(keyword));
+      return hasSwingKeyword ? '空振り三振' : '見逃し三振';
+    }
     const translated = EVENT_TRANSLATIONS[lower];
     if (translated) return translated;
     return events;
@@ -51,6 +65,10 @@ export function formatInning(inning: number, half: 'Top' | 'Bot'): string {
 
 export function formatScore(home: number, away: number, homeTeam: string, awayTeam: string): string {
   return `${awayTeam} ${away} - ${home} ${homeTeam}`;
+}
+
+export function toFixed(value: number, digits: number): string {
+  return Number.isFinite(value) ? value.toFixed(digits) : '--';
 }
 
 export function toFixed(value: number, digits: number): string {
