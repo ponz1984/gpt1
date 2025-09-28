@@ -67,9 +67,12 @@ export function formatScore(home: number, away: number, homeTeam: string, awayTe
   return `${awayTeam} ${away} - ${home} ${homeTeam}`;
 }
 
-export function toFixed(value: number, digits: number): string {
-  return Number.isFinite(value) ? value.toFixed(digits) : '--';
+export function toFixed(value: number, digits: number = 1): string {
+  if (!Number.isFinite(value)) return '-';
+  const d = Math.max(0, Math.floor(digits));
+  return value.toFixed(d);
 }
+
 
 export function toFixed(value: number, digits: number): string {
   return Number.isFinite(value) ? value.toFixed(digits) : '--';
