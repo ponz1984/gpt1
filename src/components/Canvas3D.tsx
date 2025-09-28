@@ -243,12 +243,21 @@ function Ball({
     sfxArmedRef.current = Boolean(pitch);
   }, [pitch]);
 
+  const surfaceText = useMemo(() => {
+    if (!pitch) return '';
+    return `${pitch.events ?? ''} ${pitch.description ?? ''}`.toLowerCase();
+  }, [pitch]);
+
+  const isStrikeout = useMemo(() => {
+    if (!pitch) return false;
+    return /strikeout/.test(surfaceText);
+  }, [pitch, surfaceText]);
+
   const isContact = useMemo(() => {
     if (!pitch) return false;
-    const surface = `${pitch.events ?? ''} ${pitch.description ?? ''}`.toLowerCase();
     if (pitch.type === 'X') return true;
-    return /foul|foul_tip|tip|in_play|single|double|triple|home_run|homer/.test(surface);
-  }, [pitch]);
+    return /foul|foul_tip|tip|in_play|single|double|triple|home_run|homer/.test(surfaceText);
+  }, [pitch, surfaceText]);
 
   const isFirstPitch = currentAtBatIndex === 0 && currentPitchIndex === 0;
 
@@ -418,7 +427,7 @@ function Ball({
     const soundLead = 0.03;
     const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
     if (sfxArmedRef.current && timeRef.current >= triggerTime) {
-      const target = isContact ? batSfxRef.current : ballSfxRef.current;
+      const target = isStrikeout ? ballSfxRef.current : isContact ? batSfxRef.current : ballSfxRef.current;
       sfxArmedRef.current = false;
       if (target) {
         try {
@@ -458,75 +467,100 @@ function CameraRig() {
   const cameraView = useStore((state) => state.cameraView);
   const { camera } = useThree();
 
-  useFrame(() => {
+  useEffect(() => {
     const preset = CAMERA_PRESETS[cameraView] ?? CAMERA_PRESETS.catcher;
-    camera.position.lerp(preset.position, 0.08);
+    camera.position.copy(preset.position);
     camera.lookAt(preset.target);
-  });
+  }, [cameraView, camera]);
 
   return null;
 }
 
-function SceneContents() {
-  const [trajectoryPhaseOn, setTrajectoryPhaseOn] = useState(false);
-  const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone, isUiIdle, setUiIdle, phase } = useStore(
-    (state) => {
-      const atBat = state.atBats[state.currentAtBatIndex];
-      return {
-        atBat,
-        pitch: atBat?.pitches[state.currentPitchIndex],
-        showTrajectory: state.showTrajectory,
-        showReleasePoint: state.showReleasePoint,
-        showStrikeZone: state.showStrikeZone,
-        isUiIdle: state.isUiIdle,
-        setUiIdle: state.setUiIdle,
-        phase: state.phase,
-      };
-    }
+function Scene() {
+  const atBats = useStore((state) => state.atBats);
+  const currentAtBatIndex = useStore((state) => state.currentAtBatIndex);
+  const currentPitchIndex = useStore((state) => state.currentPitchIndex);
+  const setAtBat = useStore((state) => state.setAtBat);
+  const setPitchIndex = useStore((state) => state.setPitchIndex);
+  const setPhase = useStore((state) => state.setPhase);
+  const setPlaybackTime = useStore((state) => state.setPlaybackTime);
+  const setUiIdle = useStore((state) => state.setUiIdle);
+  const setLastVisibleCount = useStore((state) => state.setLastVisibleCount);
+
+  const atBat = atBats[currentAtBatIndex];
+  const pitch = atBat?.pitches[currentPitchIndex];
+
+  const handleTrajectoryPhaseChange = useCallback(
+    (on: boolean) => {
+      if (on) {
+        setPhase('pitch');
+        setUiIdle(false);
+        if (pitch) {
+          setLastVisibleCount({
+            balls: pitch.preCount.balls,
+            strikes: pitch.preCount.strikes,
+            outs: pitch.outsBefore,
+          });
+        }
+      }
+    },
+    [pitch, setPhase, setUiIdle, setLastVisibleCount]
   );
 
   useEffect(() => {
-    setUiIdle(true);
-  }, [setUiIdle]);
+    if (!atBat || !pitch) {
+      setPhase('idle');
+      setPlaybackTime(0);
+      return;
+    }
+  }, [atBat, pitch, setPhase, setPlaybackTime]);
 
-  const allowVisuals = phase === 'pitch' || phase === 'hold';
+  useFrame(() => {
+    setPlaybackTime((prev) => prev);
+  });
+
+  const handleNextPitch = useCallback(() => {
+    if (!atBat) return;
+    if (currentPitchIndex + 1 < atBat.pitches.length) {
+      setPitchIndex(currentPitchIndex + 1);
+    } else if (currentAtBatIndex + 1 < atBats.length) {
+      setAtBat(currentAtBatIndex + 1);
+      setPitchIndex(0);
+    } else {
+      setPhase('done');
+    }
+  }, [atBat, currentPitchIndex, currentAtBatIndex, atBats, setPitchIndex, setAtBat, setPhase]);
 
   return (
-    <group>
+    <>
       <ambientLight intensity={0.6} />
-      <directionalLight position={[20, 30, 20]} intensity={0.7} />
-      <directionalLight position={[-20, 30, -20]} intensity={0.45} />
+      <directionalLight position={[5, 10, 5]} intensity={0.8} />
+      <BatterBox x={-BASE_DISTANCE / 2} />
+      <BatterBox x={BASE_DISTANCE / 2} />
+      <StrikeZone atBat={atBat} />
+      <Trajectory pitch={pitch} />
+      <ReleaseMarker pitch={pitch} />
+      <Ball pitch={pitch} onTrajectoryPhaseChange={handleTrajectoryPhaseChange} />
       <FieldElements />
-      {showStrikeZone && <StrikeZone atBat={atBat} />}
-      {showTrajectory && trajectoryPhaseOn && !isUiIdle && allowVisuals && <Trajectory pitch={pitch} />}
-      {showReleasePoint && !isUiIdle && allowVisuals && <ReleaseMarker pitch={pitch} />}
-      <Ball pitch={pitch} onTrajectoryPhaseChange={setTrajectoryPhaseOn} />
-    </group>
+    </>
   );
 }
 
 export default function Canvas3D() {
-  const bgStyle: React.CSSProperties = {
-    backgroundImage: "url('/Stadium6.png')",
-    backgroundSize: 'cover',
-    backgroundPosition: 'center bottom',
-    backgroundRepeat: 'no-repeat',
-    backgroundColor: '#0b1c22',
-  };
+  const setCamera = useStore((state) => state.setCamera);
+
+  const handleCreated = useCallback(
+    ({ camera }: { camera: THREE.Camera }) => {
+      setCamera(camera);
+    },
+    [setCamera]
+  );
 
   return (
-    <div className="canvas-wrapper" style={bgStyle}>
-      <Canvas
-        shadows
-        gl={{ alpha: true }}
-        style={{ background: 'transparent' }}
-        camera={{ position: [0, 6, 12], fov: 45 }}
-      >
-        <PerspectiveCamera makeDefault position={[0, 6, 12]} fov={45} />
-        <CameraRig />
-        <SceneContents />
-      </Canvas>
-    </div>
+    <Canvas onCreated={handleCreated} shadows>
+      <PerspectiveCamera makeDefault position={[0, 6.5, 12]} />
+      <Scene />
+    </Canvas>
   );
 }
 
