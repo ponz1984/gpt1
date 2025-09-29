@@ -23,20 +23,41 @@ const EVENT_TRANSLATIONS: Record<string, string> = {
 };
 
 export function formatEvents(events?: string, description?: string): string {
-  if (events && events.trim() !== '') {
-    const lower = events.toLowerCase();
-    const translated = EVENT_TRANSLATIONS[lower];
+  const rawEvents = events ?? '';
+  const rawDescription = description ?? '';
+  const ev = rawEvents.trim();
+  const desc = rawDescription.trim();
+  const evLower = ev.toLowerCase();
+  const descLower = desc.toLowerCase();
+
+  const resolveStrikeout = (): string => {
+    if (descLower.includes('called_strike') || descLower.includes('looking')) return '見逃し三振';
+    if (descLower.includes('swinging_strike') || descLower.includes('swinging')) return '空振り三振';
+    return '三振';
+  };
+
+  if (ev) {
+    if (evLower.includes('strikeout')) {
+      const translated = EVENT_TRANSLATIONS[evLower];
+      if (translated && evLower !== 'strikeout') return translated;
+      return resolveStrikeout();
+    }
+    const translated = EVENT_TRANSLATIONS[evLower];
     if (translated) return translated;
-    return events;
+    return rawEvents;
   }
-  if (description && description.trim() !== '') {
-    const lower = description.toLowerCase();
-    if (lower.includes('called_strike')) return '見逃しストライク';
-    if (lower.includes('swinging_strike')) return '空振りストライク';
-    if (lower.includes('foul')) return 'ファウル';
-    if (lower.includes('ball')) return 'ボール';
-    return description;
+
+  if (desc) {
+    if (descLower.includes('strikeout')) {
+      return resolveStrikeout();
+    }
+    if (descLower.includes('called_strike')) return '見逃しストライク';
+    if (descLower.includes('swinging_strike')) return '空振りストライク';
+    if (descLower.includes('foul')) return 'ファウル';
+    if (descLower.includes('ball')) return 'ボール';
+    return rawDescription;
   }
+
   return '結果不明';
 }
 
