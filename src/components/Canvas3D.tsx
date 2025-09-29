@@ -250,6 +250,12 @@ function Ball({
     return /foul|foul_tip|tip|in_play|single|double|triple|home_run|homer/.test(surface);
   }, [pitch]);
 
+  const isStrikeout = useMemo(() => {
+    if (!pitch) return false;
+    const surface = `${pitch.events ?? ''} ${pitch.description ?? ''}`.toLowerCase();
+    return surface.includes('strikeout');
+  }, [pitch]);
+
   const isFirstPitch = currentAtBatIndex === 0 && currentPitchIndex === 0;
 
   const upcomingPitchContext = useMemo(() => {
@@ -418,7 +424,11 @@ function Ball({
     const soundLead = 0.03;
     const triggerTime = Math.max(0, (pitch.duration ?? 0) - soundLead);
     if (sfxArmedRef.current && timeRef.current >= triggerTime) {
-      const target = isContact ? batSfxRef.current : ballSfxRef.current;
+      const target = isStrikeout
+        ? ballSfxRef.current
+        : isContact
+        ? batSfxRef.current
+        : ballSfxRef.current;
       sfxArmedRef.current = false;
       if (target) {
         try {
