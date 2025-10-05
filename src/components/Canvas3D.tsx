@@ -440,19 +440,17 @@ function Ball({
       }
     }
 
-    if (nextTime >= pitch.duration - 1e-3) {
-      if (phaseRef.current !== 'hold') {
-        phaseRef.current = 'hold';
-        phaseTimerRef.current = 0;
-        phaseDurationRef.current = AFTER_PITCH_HOLD_SEC;
-        ensurePhase('hold');
-        setUiIdle(false);
-        setLastVisibleCount({
-          balls: pitch.postCount.balls,
-          strikes: pitch.postCount.strikes,
-          outs: pitch.outsAfter,
-        });
-      }
+    if (nextTime >= pitch.duration - 1e-3 && phaseRef.current === 'playing') {
+      phaseRef.current = 'hold';
+      phaseTimerRef.current = 0;
+      phaseDurationRef.current = AFTER_PITCH_HOLD_SEC;
+      ensurePhase('hold');
+      setUiIdle(false);
+      setLastVisibleCount({
+        balls: pitch.postCount.balls,
+        strikes: pitch.postCount.strikes,
+        outs: pitch.outsAfter,
+      });
     }
   });
 
@@ -461,6 +459,169 @@ function Ball({
       <sphereGeometry args={[0.18, 32, 32]} />
       <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.2} />
     </mesh>
+  );
+}
+
+function MultiReplayTrajectory({ pitch, multiTime }: { pitch: Pitch; multiTime: number }) {
+  const baseSpeedFactor = useMemo(() => Math.max(0.4, pitch.release_speed / 90), [pitch.release_speed]);
+
+  const points = useMemo(() => {
+    const samples = pitch.samples;
+    if (samples.length === 0) return [];
+    const duration = Math.max(EPS, pitch.duration);
+    const effectiveTime = multiTime - TRAJECTORY_LEAD_SEC;
+    if (effectiveTime <= 0) {
+      return [];
+    }
+    const pitchTime = Math.min(duration, effectiveTime * baseSpeedFactor);
+    const tVisible = Math.max(0, pitchTime - TRAIL_DELAY_S);
+    const progress = Math.min(1, tVisible / duration);
+
+    const showFull = pitchTime >= duration - EPS;
+
+    if (samples.length < 2) {
+      const start = worldFromSample(samples[0]);
+      const current = getPositionAtTime(samples, pitchTime);
+      return [start, worldFromSample(current)];
+    }
+
+    if (progress <= 0 && !showFull) {
+      const start = worldFromSample(samples[0]);
+      const current = getPositionAtTime(samples, pitchTime);
+      return [start, worldFromSample(current)];
+    }
+
+    if (showFull) {
+      return samples.map(worldFromSample);
+    }
+
+    const lastIdx = Math.min(samples.length - 1, Math.max(1, Math.floor(progress * (samples.length - 1))));
+    const visible = samples.slice(0, lastIdx + 1);
+    return visible.map(worldFromSample);
+  }, [multiTime, pitch, baseSpeedFactor]);
+
+  if (points.length < 2) return null;
+
+  return <Line points={points} color={resolvePitchColor(pitch)} lineWidth={3} transparent opacity={0.9} />;
+}
+
+function MultiReplayBall({ pitch }: { pitch: Pitch }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const baseSpeedFactor = useMemo(() => Math.max(0.4, pitch.release_speed / 90), [pitch.release_speed]);
+
+  useEffect(() => {
+    if (!meshRef.current) return;
+    const start = worldFromSample(pitch.samples[0]);
+    meshRef.current.position.copy(start);
+    meshRef.current.visible = false;
+  }, [pitch]);
+
+  useFrame(() => {
+    const state = useStore.getState();
+    if (!state.multiReplayActive) {
+      if (meshRef.current) {
+        meshRef.current.visible = false;
+      }
+      return;
+    }
+
+    if (!meshRef.current) return;
+
+    const elapsed = state.multiReplayTime - TRAJECTORY_LEAD_SEC;
+    if (elapsed <= 0) {
+      meshRef.current.visible = false;
+      const start = worldFromSample(pitch.samples[0]);
+      meshRef.current.position.copy(start);
+      return;
+    }
+
+    const pitchTime = Math.min(pitch.duration, elapsed * baseSpeedFactor);
+    const sample = getPositionAtTime(pitch.samples, pitchTime);
+    const position = worldFromSample(sample);
+    meshRef.current.visible = true;
+    meshRef.current.position.copy(position);
+  });
+
+  return (
+    <mesh ref={meshRef}>
+      <sphereGeometry args={[0.18, 32, 32]} />
+      <meshStandardMaterial color="#fef3c7" emissive="#fde68a" emissiveIntensity={0.2} />
+    </mesh>
+  );
+}
+
+function MultiReplayScene() {
+  const {
+    multiReplayPitches,
+    showTrajectory,
+    showReleasePoint,
+    showStrikeZone,
+    atBats,
+    multiReplayAtBatIndex,
+    playbackSpeed,
+    multiReplayActive,
+    setMultiReplayTime,
+    stopMultiReplay,
+  } = useStore((state) => ({
+    multiReplayPitches: state.multiReplayPitches,
+    showTrajectory: state.showTrajectory,
+    showReleasePoint: state.showReleasePoint,
+    showStrikeZone: state.showStrikeZone,
+    atBats: state.atBats,
+    multiReplayAtBatIndex: state.multiReplayAtBatIndex,
+    playbackSpeed: state.playbackSpeed,
+    multiReplayActive: state.multiReplayActive,
+    setMultiReplayTime: state.setMultiReplayTime,
+    stopMultiReplay: state.stopMultiReplay,
+  }));
+  const multiTime = useStore((state) => state.multiReplayTime);
+
+  const zoneAtBat = useMemo(() => {
+    if (multiReplayAtBatIndex === undefined) return undefined;
+    return atBats[multiReplayAtBatIndex];
+  }, [atBats, multiReplayAtBatIndex]);
+
+  const totalDuration = useMemo(() => {
+    if (multiReplayPitches.length === 0) return 0;
+    return multiReplayPitches.reduce((max, pitch) => {
+      const baseFactor = Math.max(0.4, pitch.release_speed / 90);
+      const required = TRAJECTORY_LEAD_SEC + pitch.duration / baseFactor + AFTER_PITCH_HOLD_SEC;
+      return Math.max(max, required);
+    }, 0);
+  }, [multiReplayPitches]);
+
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    if (!multiReplayActive) return;
+    timeRef.current = 0;
+    setMultiReplayTime(0);
+  }, [multiReplayActive, multiReplayPitches, setMultiReplayTime]);
+
+  useFrame((_, delta) => {
+    if (!multiReplayActive) return;
+    timeRef.current += delta * playbackSpeed;
+    setMultiReplayTime(timeRef.current);
+    if (totalDuration > 0 && timeRef.current >= totalDuration) {
+      stopMultiReplay();
+    }
+  });
+
+  return (
+    <group>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[20, 30, 20]} intensity={0.7} />
+      <directionalLight position={[-20, 30, -20]} intensity={0.45} />
+      <FieldElements />
+      {showStrikeZone && zoneAtBat && <StrikeZone atBat={zoneAtBat} />}
+      {multiReplayPitches.map((pitch) => (
+        <group key={pitch.id}>
+          {showTrajectory && <MultiReplayTrajectory pitch={pitch} multiTime={multiTime} />}
+          {showReleasePoint && <ReleaseMarker pitch={pitch} />}
+          <MultiReplayBall pitch={pitch} />
+        </group>
+      ))}
+    </group>
   );
 }
 
@@ -478,6 +639,7 @@ function CameraRig() {
 }
 
 function SceneContents() {
+  const multiReplayActive = useStore((state) => state.multiReplayActive);
   const [trajectoryPhaseOn, setTrajectoryPhaseOn] = useState(false);
   const { atBat, pitch, showTrajectory, showReleasePoint, showStrikeZone, isUiIdle, setUiIdle, phase } = useStore(
     (state) => {
@@ -496,8 +658,13 @@ function SceneContents() {
   );
 
   useEffect(() => {
+    if (multiReplayActive) return;
     setUiIdle(true);
-  }, [setUiIdle]);
+  }, [setUiIdle, multiReplayActive]);
+
+  if (multiReplayActive) {
+    return <MultiReplayScene />;
+  }
 
   const allowVisuals = phase === 'pitch' || phase === 'hold';
 
@@ -516,7 +683,7 @@ function SceneContents() {
 }
 
 export default function Canvas3D() {
-  const bgStyle: React.CSSProperties = {
+  const bgStyle: Record<string, string> = {
     backgroundImage: "url('/Stadium6.png')",
     backgroundSize: 'cover',
     backgroundPosition: 'center bottom',

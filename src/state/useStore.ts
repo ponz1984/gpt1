@@ -17,6 +17,10 @@ type StoreState = {
   isPlaying: boolean;
   playbackSpeed: number;
   playbackTime: number;
+  multiReplayActive: boolean;
+  multiReplayPitches: Pitch[];
+  multiReplayTime: number;
+  multiReplayAtBatIndex?: number;
   cameraView: CameraView;
   error?: string;
   showTrajectory: boolean;
@@ -40,6 +44,9 @@ type StoreState = {
   setPhase: (phase: Phase) => void;
   setLastVisibleCount: (count?: FrozenCount) => void;
   setPlaybackTime: (t: number) => void;
+  startMultiReplay: () => void;
+  stopMultiReplay: () => void;
+  setMultiReplayTime: (t: number) => void;
   reset: () => void;
 };
 
@@ -56,6 +63,10 @@ export const useStore = create<StoreState>((set, get) => ({
   isPlaying: false,
   playbackSpeed: 1,
   playbackTime: 0,
+  multiReplayActive: false,
+  multiReplayPitches: [],
+  multiReplayTime: 0,
+  multiReplayAtBatIndex: undefined,
   cameraView: 'catcher',
   error: undefined,
   showTrajectory: true,
@@ -75,6 +86,10 @@ export const useStore = create<StoreState>((set, get) => ({
         currentPitchIndex: 0,
         isPlaying: false,
         error: undefined,
+        multiReplayActive: false,
+        multiReplayPitches: [],
+        multiReplayTime: 0,
+        multiReplayAtBatIndex: undefined,
         showTrajectory: true,
         showReleasePoint: true,
         showStrikeZone: true,
@@ -92,6 +107,10 @@ export const useStore = create<StoreState>((set, get) => ({
         currentPitchIndex: 0,
         isPlaying: false,
         error: err instanceof Error ? err.message : 'CSVの解析に失敗しました。',
+        multiReplayActive: false,
+        multiReplayPitches: [],
+        multiReplayTime: 0,
+        multiReplayAtBatIndex: undefined,
         showTrajectory: true,
         showReleasePoint: true,
         showStrikeZone: true,
@@ -178,6 +197,28 @@ export const useStore = create<StoreState>((set, get) => ({
   setPhase: (phase) => set({ phase }),
   setLastVisibleCount: (count) => set({ lastVisibleCount: count }),
   setPlaybackTime: (t) => set({ playbackTime: t }),
+  startMultiReplay: () => {
+    const { pitches } = get();
+    if (pitches.length === 0) return;
+    const selected = pitches.slice(0, 10);
+    if (selected.length === 0) return;
+    const first = selected[0];
+    set({
+      multiReplayActive: true,
+      multiReplayPitches: selected,
+      multiReplayTime: 0,
+      multiReplayAtBatIndex: first?.atBatIndex,
+      isPlaying: false,
+    });
+  },
+  stopMultiReplay: () =>
+    set({
+      multiReplayActive: false,
+      multiReplayPitches: [],
+      multiReplayTime: 0,
+      multiReplayAtBatIndex: undefined,
+    }),
+  setMultiReplayTime: (t) => set({ multiReplayTime: t }),
   reset: () =>
     set({
       atBats: [],
@@ -187,6 +228,10 @@ export const useStore = create<StoreState>((set, get) => ({
       currentPitchIndex: 0,
       isPlaying: false,
       error: undefined,
+      multiReplayActive: false,
+      multiReplayPitches: [],
+      multiReplayTime: 0,
+      multiReplayAtBatIndex: undefined,
       showTrajectory: true,
       showReleasePoint: true,
       showStrikeZone: true,

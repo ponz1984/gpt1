@@ -5,11 +5,21 @@ import { formatInning } from '../utils/formatters';
 import { getTeamInfo } from '../utils/teamMaps';
 
 function CountDisplay() {
-  const { phase, displayPitch, lastVisibleCount } = useStore((state) => ({
+  const { phase, displayPitch, lastVisibleCount, multiReplayActive } = useStore((state) => ({
     phase: state.phase,
     displayPitch: selectDisplayPitch(state),
     lastVisibleCount: state.lastVisibleCount,
+    multiReplayActive: state.multiReplayActive,
   }));
+
+  if (multiReplayActive) {
+    return (
+      <div className="count-card">
+        <div className="count-title">カウント</div>
+        <div className="count-change">N/A</div>
+      </div>
+    );
+  }
 
   if (phase === 'preFirst' || phase === 'arming') {
     return null;
@@ -50,12 +60,23 @@ function CountDisplay() {
 }
 
 function PitchInfo() {
-  const { atBat, pitch, meta, phase } = useStore((state) => ({
+  const { atBat, pitch, meta, phase, multiReplayActive } = useStore((state) => ({
     atBat: selectDisplayAtBat(state),
     pitch: selectDisplayPitch(state),
     meta: state.meta,
     phase: state.phase,
+    multiReplayActive: state.multiReplayActive,
   }));
+
+  if (multiReplayActive) {
+    return (
+      <div className="pitch-card">
+        <div className="pitch-type">N/A</div>
+        <div className="pitch-speed">--</div>
+        <div className="pitch-extra">球種コード: --</div>
+      </div>
+    );
+  }
 
   if (phase === 'preFirst' || phase === 'arming') return null;
 
@@ -71,10 +92,19 @@ function PitchInfo() {
 }
 
 function BatterInfo() {
-  const { atBat, phase } = useStore((state) => ({
+  const { atBat, phase, multiReplayActive } = useStore((state) => ({
     atBat: selectDisplayAtBat(state),
     phase: state.phase,
+    multiReplayActive: state.multiReplayActive,
   }));
+
+  if (multiReplayActive) {
+    return (
+      <div className="batter-card">
+        <div className="batter-label">打者: N/A</div>
+      </div>
+    );
+  }
 
   if (phase === 'preFirst' || phase === 'arming') return null;
   if (!atBat) return null;
@@ -87,19 +117,45 @@ function BatterInfo() {
 }
 
 function ScoreBoard() {
-  const { meta, pitch, atBat } = useStore((state) => {
+  const { meta, pitch, atBat, multiReplayActive } = useStore((state) => {
     const displayPitch = selectDisplayPitch(state);
     const displayAtBat = selectDisplayAtBat(state);
     if (displayPitch && displayAtBat) {
-      return { meta: state.meta, pitch: displayPitch, atBat: displayAtBat };
+      return { meta: state.meta, pitch: displayPitch, atBat: displayAtBat, multiReplayActive: state.multiReplayActive };
     }
     const currentAtBat = state.atBats[state.currentAtBatIndex];
     return {
       meta: state.meta,
       pitch: selectCurrentPitch(state),
       atBat: currentAtBat,
+      multiReplayActive: state.multiReplayActive,
     };
   });
+
+  if (multiReplayActive) {
+    return (
+      <div className="scoreboard" style={{ borderColor: 'rgba(148, 163, 184, 0.35)' }}>
+        <div className="scoreboard-header">
+          <div className="team away">
+            <span className="label">N/A</span>
+            <span className="score">--</span>
+          </div>
+          <div className="vs">vs</div>
+          <div className="team home">
+            <span className="label">N/A</span>
+            <span className="score">--</span>
+          </div>
+        </div>
+        <div className="scoreboard-sub">
+          <div className="game-info">
+            <div>N/A</div>
+            <div>-</div>
+          </div>
+          <div className="pitcher">投手: N/A</div>
+        </div>
+      </div>
+    );
+  }
 
   const teams = useMemo(() => {
     if (!meta) return null;
@@ -147,7 +203,11 @@ function ScoreBoard() {
 }
 
 function ResultBanner() {
-  const pitch = useStore((state) => selectDisplayPitch(state));
+  const { pitch, multiReplayActive } = useStore((state) => ({
+    pitch: selectDisplayPitch(state),
+    multiReplayActive: state.multiReplayActive,
+  }));
+  if (multiReplayActive) return null;
   if (!pitch) return null;
   const resultText = pitch.displayResult;
   return (
@@ -161,7 +221,18 @@ function ResultBanner() {
 }
 
 function BasesDisplay() {
-  const pitch = useStore((state) => selectDisplayPitch(state));
+  const { pitch, multiReplayActive } = useStore((state) => ({
+    pitch: selectDisplayPitch(state),
+    multiReplayActive: state.multiReplayActive,
+  }));
+  if (multiReplayActive) {
+    return (
+      <div className="bases-card">
+        <div className="bases-title">走者状況</div>
+        <div className="bases-text">N/A</div>
+      </div>
+    );
+  }
   if (!pitch) return null;
 
   const { first, second, third } = pitch.bases;
