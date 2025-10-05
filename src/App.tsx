@@ -3,6 +3,7 @@ import Controls from './components/Controls';
 import Dropzone from './components/Dropzone';
 import Hud from './components/Hud';
 import Timeline from './components/Timeline';
+import SimultaneousReplayButton from './components/SimultaneousReplayButton';
 import { useStore } from './state/useStore';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
       <footer className="app-footer">
         <p>⚾️ 指定フォーマットのCSVをクライアントサイドのみで解析し、three.js で再生します。</p>
       </footer>
+      <SimultaneousReplayButton />
     </div>
   );
 }
