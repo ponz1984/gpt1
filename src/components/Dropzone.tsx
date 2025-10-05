@@ -30,7 +30,8 @@ export default function Dropzone() {
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       setDragging(false);
-      handleFiles(event.dataTransfer.files);
+      const files = event.dataTransfer?.files ?? null;
+      handleFiles(files);
     },
     [handleFiles]
   );

@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import type { ParseResult } from 'papaparse';
 import { deriveOutsAfter, derivePostCount } from './count';
 import { sampleTrajectory } from './physics';
 import type {
@@ -54,7 +55,7 @@ function ensureRequiredColumns(columns: string[]): void {
   }
 }
 
-function toPitchRow(raw: Papa.ParseResult<unknown>['data'][number]): PitchRow {
+function toPitchRow(raw: ParseResult<unknown>['data'][number]): PitchRow {
   const row = raw as Record<string, string>;
   const parseRunnerId = (value: string | undefined): number | undefined => {
     if (!value || value.trim() === '') return undefined;
@@ -275,7 +276,7 @@ function groupAtBats(rows: PitchRow[], pitcherNames: Map<number, string>): AtBat
 }
 
 export function parseCsv(text: string): ParsedGame {
-  const result = Papa.parse(text, {
+  const result: ParseResult<Record<string, string>> = Papa.parse(text, {
     header: true,
     skipEmptyLines: true,
   });
