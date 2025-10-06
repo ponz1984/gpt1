@@ -200,14 +200,20 @@ export const useStore = create<StoreState>((set, get) => ({
   startMultiReplay: () => {
     const { pitches } = get();
     if (pitches.length === 0) return;
-    const selected = pitches.slice(0, 10);
+
+    const selected = pitches
+      .slice(0, 10)
+      .filter((pitch) => Array.isArray(pitch.samples) && pitch.samples.length > 0);
+
     if (selected.length === 0) return;
-    const first = selected[0];
+
+    const firstValid = selected.find((pitch) => Number.isFinite(pitch.atBatIndex));
+
     set({
       multiReplayActive: true,
       multiReplayPitches: selected,
       multiReplayTime: 0,
-      multiReplayAtBatIndex: first?.atBatIndex,
+      multiReplayAtBatIndex: firstValid?.atBatIndex,
       isPlaying: false,
     });
   },

@@ -42,11 +42,30 @@ const AFTER_PITCH_HOLD_SEC = 0.7 + 1.5;
 const TRAJECTORY_LEAD_SEC = 0.05;
 const TRAIL_DELAY_S = 0.12;
 const EPS = 1e-4;
+const DEFAULT_PITCH_DURATION = 0.6;
 
 function worldFromSample(sample: { x: number; y: number; z: number }): THREE.Vector3 {
   // Statcast: x(左右), y(捕手方向への距離), z(高さ)
   // World   : x(左右), y(高さ), z(奥行き) ・・・ y と z を入れ替え、z は符号反転
   return new THREE.Vector3(sample.x, sample.z, -sample.y);
+}
+
+function resolveBaseSpeedFactor(releaseSpeed: number | undefined): number {
+  if (!Number.isFinite(releaseSpeed) || !releaseSpeed || releaseSpeed <= 0) {
+    return 1;
+  }
+  const normalised = releaseSpeed / 90;
+  if (!Number.isFinite(normalised) || normalised <= 0) {
+    return 1;
+  }
+  return Math.max(0.4, normalised);
+}
+
+function resolvePitchDuration(pitch: Pitch): number {
+  if (Number.isFinite(pitch.duration) && pitch.duration > EPS) {
+    return pitch.duration;
+  }
+  return DEFAULT_PITCH_DURATION;
 }
 
 function resolvePitchColor(pitch: Pitch | undefined): string {
@@ -411,7 +430,7 @@ function Ball({
       return;
     }
 
-    const baseSpeedFactor = Math.max(0.4, pitch.release_speed / 90);
+    const baseSpeedFactor = resolveBaseSpeedFactor(pitch.release_speed);
     const scaledDelta = delta * playbackSpeed * baseSpeedFactor;
 
     const nextTime = Math.min(pitch.duration, timeRef.current + scaledDelta);
@@ -463,17 +482,27 @@ function Ball({
 }
 
 function MultiReplayTrajectory({ pitch, multiTime }: { pitch: Pitch; multiTime: number }) {
-  const baseSpeedFactor = useMemo(() => Math.max(0.4, pitch.release_speed / 90), [pitch.release_speed]);
+  const baseSpeedFactor = useMemo(
+    () => resolveBaseSpeedFactor(pitch.release_speed),
+    [pitch.release_speed]
+  );
 
   const points = useMemo(() => {
     const samples = pitch.samples;
     if (samples.length === 0) return [];
-    const duration = Math.max(EPS, pitch.duration);
+    const duration = resolvePitchDuration(pitch);
     const effectiveTime = multiTime - TRAJECTORY_LEAD_SEC;
-    if (effectiveTime <= 0) {
+    if (!Number.isFinite(effectiveTime) || effectiveTime <= 0) {
       return [];
     }
-    const pitchTime = Math.min(duration, effectiveTime * baseSpeedFactor);
+    const scaledTime = effectiveTime * baseSpeedFactor;
+    if (!Number.isFinite(scaledTime)) {
+      return [];
+    }
+    const pitchTime = Math.min(duration, Math.max(0, scaledTime));
+    if (!Number.isFinite(pitchTime)) {
+      return [];
+    }
     const tVisible = Math.max(0, pitchTime - TRAIL_DELAY_S);
     const progress = Math.min(1, tVisible / duration);
 
@@ -507,11 +536,19 @@ function MultiReplayTrajectory({ pitch, multiTime }: { pitch: Pitch; multiTime: 
 
 function MultiReplayBall({ pitch }: { pitch: Pitch }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const baseSpeedFactor = useMemo(() => Math.max(0.4, pitch.release_speed / 90), [pitch.release_speed]);
+  const baseSpeedFactor = useMemo(
+    () => resolveBaseSpeedFactor(pitch.release_speed),
+    [pitch.release_speed]
+  );
 
   useEffect(() => {
     if (!meshRef.current) return;
-    const start = worldFromSample(pitch.samples[0]);
+    const firstSample = pitch.samples[0];
+    if (!firstSample) {
+      meshRef.current.visible = false;
+      return;
+    }
+    const start = worldFromSample(firstSample);
     meshRef.current.position.copy(start);
     meshRef.current.visible = false;
   }, [pitch]);
@@ -526,16 +563,30 @@ function MultiReplayBall({ pitch }: { pitch: Pitch }) {
     }
 
     if (!meshRef.current) return;
+    if (pitch.samples.length === 0) {
+      meshRef.current.visible = false;
+      return;
+    }
 
     const elapsed = state.multiReplayTime - TRAJECTORY_LEAD_SEC;
     if (elapsed <= 0) {
       meshRef.current.visible = false;
-      const start = worldFromSample(pitch.samples[0]);
-      meshRef.current.position.copy(start);
+      const firstSample = pitch.samples[0];
+      if (firstSample) {
+        const start = worldFromSample(firstSample);
+        meshRef.current.position.copy(start);
+      }
       return;
     }
 
-    const pitchTime = Math.min(pitch.duration, elapsed * baseSpeedFactor);
+    const duration = resolvePitchDuration(pitch);
+    const scaledTime = elapsed * baseSpeedFactor;
+    const pitchTime = Math.min(duration, Math.max(0, Number.isFinite(scaledTime) ? scaledTime : 0));
+    if (!Number.isFinite(pitchTime)) {
+      meshRef.current.visible = false;
+      return;
+    }
+
     const sample = getPositionAtTime(pitch.samples, pitchTime);
     const position = worldFromSample(sample);
     meshRef.current.visible = true;
@@ -584,8 +635,9 @@ function MultiReplayScene() {
   const totalDuration = useMemo(() => {
     if (multiReplayPitches.length === 0) return 0;
     return multiReplayPitches.reduce((max, pitch) => {
-      const baseFactor = Math.max(0.4, pitch.release_speed / 90);
-      const required = TRAJECTORY_LEAD_SEC + pitch.duration / baseFactor + AFTER_PITCH_HOLD_SEC;
+      const baseFactor = resolveBaseSpeedFactor(pitch.release_speed);
+      const duration = resolvePitchDuration(pitch);
+      const required = TRAJECTORY_LEAD_SEC + duration / baseFactor + AFTER_PITCH_HOLD_SEC;
       return Math.max(max, required);
     }, 0);
   }, [multiReplayPitches]);
